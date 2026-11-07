@@ -6,7 +6,9 @@ package mobile
 
 import (
 	"os"
+	"path/filepath"
 	"runtime"
+	"runtime/debug"
 
 	C "github.com/sagernet/sing-box/constant"
 	E "github.com/sagernet/sing/common/exceptions"
@@ -51,6 +53,9 @@ func Setup(options *SetupOptions) error {
 			return E.Cause(err, "create ", dir)
 		}
 	}
+	if sBasePath != "" {
+		crashOutput(filepath.Join(sBasePath, "core-crash.log"))
+	}
 	// Like the desktop's XRAY_LOCATION_ASSET: without it Xray looks for geoip.dat/geosite.dat next to
 	// app_process in /system/bin. Set from Go because the runtime copied the environment at load time.
 	if sBasePath != "" {
@@ -59,6 +64,22 @@ func Setup(options *SetupOptions) error {
 		}
 	}
 	return nil
+}
+
+// crashOutput keeps the text of a fatal Go error: in a library it ends in SIGABRT, and Android
+// drops what the runtime prints, so the log export reads it from this file instead.
+func crashOutput(path string) {
+	flags := os.O_CREATE | os.O_WRONLY | os.O_APPEND
+	if info, err := os.Stat(path); err == nil && info.Size() > 256<<10 {
+		flags |= os.O_TRUNC
+	}
+	file, err := os.OpenFile(path, flags, 0o600)
+	if err != nil {
+		return
+	}
+	// The runtime keeps its own duplicate of the descriptor.
+	_ = debug.SetCrashOutput(file, debug.CrashOptions{})
+	_ = file.Close()
 }
 
 func Version() string {
