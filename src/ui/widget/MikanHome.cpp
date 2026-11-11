@@ -68,6 +68,29 @@
 
 static QString T(const char *text) { return QCoreApplication::translate("MikanHome", text); }
 
+// A popup is created on the primary display. The anchor's own screen() can stay there after the
+// window is dragged, so the screen is taken from the point under the control.
+static QScreen *screenContaining(const QPoint &global) {
+    if (QScreen *screen = QGuiApplication::screenAt(global)) return screen;
+    for (QScreen *screen : QGuiApplication::screens())
+        if (screen->geometry().contains(global)) return screen;
+    return QGuiApplication::primaryScreen();
+}
+
+static QRect screenAvailableAt(const QPoint &global) {
+    if (QScreen *screen = screenContaining(global)) return screen->availableGeometry();
+    return QRect(0, 0, 1280, 800);
+}
+
+static void bindPopupToScreen(QWidget *popup, const QPoint &global) {
+    if (!popup) return;
+    popup->setAttribute(Qt::WA_NativeWindow);
+    popup->winId();
+    if (QWindow *handle = popup->windowHandle()) {
+        if (QScreen *screen = screenContaining(global)) handle->setScreen(screen);
+    }
+}
+
 // The mobile app's motion curve: PathInterpolator(.2, 0, 0, 1).
 static QEasingCurve softCurve() {
     QEasingCurve curve(QEasingCurve::BezierSpline);
@@ -1347,6 +1370,10 @@ namespace {
     protected:
         void showEvent(QShowEvent *event) override {
             QWidget::showEvent(event);
+            // show() can put a new popup back on the primary display. Place it again once the window exists.
+            const QPoint probe = m_anchor ? m_anchor->mapToGlobal(m_anchor->rect().center()) : (m_hasPos ? m_pos : pos());
+            bindPopupToScreen(this, probe);
+            move(m_shownAt);
             if (QLayout *box = layout()) box->activate();
             clipPages();
             focusInitial();
@@ -1778,10 +1805,11 @@ namespace {
         }
 
         QRect availRect() const {
-            QScreen *screen = m_anchor ? m_anchor->screen() : nullptr;
-            if (!screen && m_hasPos) screen = QGuiApplication::screenAt(m_pos);
-            if (!screen) screen = QGuiApplication::primaryScreen();
-            return screen ? screen->availableGeometry() : QRect(0, 0, 1280, 800);
+            QPoint probe;
+            if (m_anchor) probe = m_anchor->mapToGlobal(m_anchor->rect().center());
+            else if (m_hasPos) probe = m_pos;
+            else probe = pos();
+            return screenAvailableAt(probe);
         }
 
         QPoint destinationFor(const QSize &size) const {
@@ -1863,6 +1891,8 @@ namespace {
     void openSheet(QWidget *anchor, QMenu *menu, bool ownsMenu, bool alignRight = false, QPoint pos = {}, bool hasPos = false, const QString &hint = {}) {
         auto *sheet = new ActionSheet(anchor, menu, ownsMenu, alignRight, pos, hasPos, hint);
         guardReopen(sheet, anchor);
+        const QPoint probe = anchor ? anchor->mapToGlobal(anchor->rect().center()) : pos;
+        bindPopupToScreen(sheet, probe);
         sheet->foldForOpen();
         sheet->show();
         sheet->playOpen();
@@ -2379,7 +2409,7 @@ void MikanHome::buildControls(QVBoxLayout *root) {
     subscriptionLayout->setContentsMargins(16, 12, 12, 12);
     subscriptionLayout->setSpacing(8);
     subscriptionLayout->addStretch(1);
-    subscriptionLayout->addWidget(label(T("Subscription"), 12, true));
+    subscriptionLayout->addWidget(label(T("Groups"), 12, true));
     auto *chipRow = new QHBoxLayout;
     chipRow->setSpacing(8);
     m_chip = new MikanTile(MikanTile::Chip);
@@ -3006,8 +3036,7 @@ void MikanHome::showGroupPicker() {
     rows->setSpacing(6);
 
     const int current = Configs::dataManager->settingsRepo->current_group;
-    for (int index = 0; index < mw->ui->tabWidget->count(); ++index) {
-        const int gid = mw->ui->tabWidget->widget(index)->property("gid").toInt();
+    for (const int gid : Configs::dataManager->groupsRepo->GetGroupsTabOrder()) {
         const auto group = Configs::dataManager->groupsRepo->GetGroup(gid);
         if (!group) continue;
         auto *row = new MikanTile(MikanTile::Text);
@@ -3028,26 +3057,22 @@ void MikanHome::showGroupPicker() {
     else scroll->setFixedHeight(std::min(listHeight, 480));
     layout->addWidget(scroll);
 
-    const auto action = [layout](const QString &text, const QString &icon, QAction *target) {
-        auto *button = new MikanTile(MikanTile::Text);
-        button->setIconName(icon);
-        button->setText(text);
-        button->setTextSize(14);
-        button->setFixedHeight(48);
-        button->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
-        QObject::connect(button, &QAbstractButton::clicked, target, &QAction::trigger);
-        layout->addWidget(button);
-        return button;
-    };
-    auto *add = action(T("Add group or subscription"), QStringLiteral("add"), mw->ui->actionAdd_New_Group);
-    auto *manage = action(T("Manage groups and subscriptions"), QStringLiteral("settings"), mw->ui->menu_manage_groups);
-
-    const int width = std::max({m_chip->width() + 56, list->sizeHint().width() + 32, add->sizeHint().width() + 32, manage->sizeHint().width() + 32});
-    popup->setFixedWidth(std::min(width, 560));
+    const int width = std::max(m_chip->width(), list->sizeHint().width() + 32);
+    popup->setFixedWidth(std::min(std::max(width, 220), 560));
     popup->adjustSize();
-    const QPoint origin = m_chip->mapToGlobal(QPoint(0, m_chip->height() + 8));
-    popup->move(std::min(origin.x(), QGuiApplication::primaryScreen()->availableGeometry().right() - popup->width() - 8), origin.y());
+    const QPoint anchor = m_chip->mapToGlobal(m_chip->rect().center());
+    const QRect avail = screenAvailableAt(anchor);
+    QPoint origin = m_chip->mapToGlobal(QPoint(0, m_chip->height() + 8));
+    if (origin.x() + popup->width() > avail.right() - 8) origin.setX(avail.right() - popup->width() - 8);
+    if (origin.x() < avail.left() + 8) origin.setX(avail.left() + 8);
+    if (origin.y() + popup->height() > avail.bottom() - 8) {
+        const int above = m_chip->mapToGlobal(QPoint(0, 0)).y() - popup->height() - 8;
+        origin.setY(above >= avail.top() + 8 ? above : std::max(avail.top() + 8, avail.bottom() - popup->height() - 8));
+    }
+    bindPopupToScreen(popup, anchor);
+    popup->move(origin);
     popup->show();
+    popup->move(origin);
 }
 
 void MikanHome::showAppMenu(QWidget *anchor) {
@@ -3203,6 +3228,30 @@ bool MikanHome::eventFilter(QObject *watched, QEvent *event) {
 
 // ---------------------------------------------------------------- switching interfaces
 
+#ifdef Q_OS_WIN
+// Clearing FramelessWindowHint recreates the window, but Windows keeps the old non-client
+// area when that happens from a maximized or just-closed window: the caption bits never land.
+static void repairNativeCaption(QWidget *window) {
+    if (!window->testAttribute(Qt::WA_WState_Created) || window->isFullScreen()) return;
+    const HWND hwnd = reinterpret_cast<HWND>(window->winId());
+    if (!hwnd) return;
+    using SetAttribute = HRESULT(WINAPI *)(HWND, DWORD, LPCVOID, DWORD);
+    static const auto set = [] {
+        const HMODULE dwm = LoadLibraryW(L"dwmapi.dll");
+        return dwm ? reinterpret_cast<SetAttribute>(GetProcAddress(dwm, "DwmSetWindowAttribute")) : nullptr;
+    }();
+    const DWORD preference = 0; // DWMWCP_DEFAULT. The frameless window asked for round corners; a caption needs the system frame.
+    if (set) set(hwnd, 33 /* DWMWA_WINDOW_CORNER_PREFERENCE */, &preference, sizeof preference);
+    const LONG_PTR need = WS_CAPTION | WS_THICKFRAME | WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX;
+    const LONG_PTR style = GetWindowLongPtrW(hwnd, GWL_STYLE);
+    if ((style & need) != need) SetWindowLongPtrW(hwnd, GWL_STYLE, style | need);
+    // FRAMECHANGED on a minimized window can restore it. The style bits above are enough until it is.
+    if (window->isMinimized()) return;
+    SetWindowPos(hwnd, nullptr, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
+    RedrawWindow(hwnd, nullptr, nullptr, RDW_FRAME | RDW_INVALIDATE);
+}
+#endif
+
 void MainWindow::applyInterfaceStyle(bool animated) {
     const bool wantMikan = Mikan::active();
     QLabel *cover = nullptr;
@@ -3233,17 +3282,73 @@ void MainWindow::applyInterfaceStyle(bool animated) {
         rootStack->setCurrentIndex(0);
     }
     const bool frameless = wantMikan;
-    // Changing the frame re-creates the window and would hide an open dialog with it: after the dialog closes.
-    QDialog *open = nullptr;
-    for (auto *dialog : findChildren<QDialog *>()) if (dialog->isVisible()) open = dialog;
-    if (open && bool(windowFlags() & Qt::FramelessWindowHint) != frameless) {
-        connect(open, &QDialog::finished, this, [this] { applyInterfaceStyle(false); }, Qt::SingleShotConnection);
-    } else if (bool(windowFlags() & Qt::FramelessWindowHint) != frameless) {
-        const bool shown = isVisible();
-        const bool maximized = isMaximized();
-        setWindowFlag(Qt::FramelessWindowHint, frameless);
-        if (shown) maximized ? showMaximized() : show();
-        if (frameless) Mikan::roundCorners(this, false);
+    const bool frameDiffers = bool(windowFlags() & Qt::FramelessWindowHint) != frameless;
+    // Changing the frame re-creates the window and would hide an open dialog with it.
+    // Doing it inside the dialog's finished() is still too early: the owner window is torn down
+    // mid-hide and Windows drops the caption. Wait until that close has returned to the event loop.
+    if (frameDiffers) {
+        QList<QDialog *> dialogs;
+        for (auto *dialog : findChildren<QDialog *>())
+            if (dialog->isVisible()) dialogs.append(dialog);
+        if (!dialogs.isEmpty()) {
+            if (!m_frameChangeDeferred) {
+                m_frameChangeDeferred = true;
+                for (auto *dialog : dialogs) {
+                    connect(dialog, &QDialog::finished, this, [this] {
+                        QTimer::singleShot(0, this, [this] {
+                            m_frameChangeDeferred = false;
+                            applyInterfaceStyle(false);
+                        });
+                    }, Qt::SingleShotConnection);
+                }
+            }
+        } else {
+            const bool shown = isVisible();
+            const bool minimized = isMinimized();
+            const bool maximized = isMaximized();
+            const bool full = isFullScreen();
+            // A maximized frameless window keeps its frame margins. Drop that state in Qt only —
+            // the native window stays put until setWindowFlags recreates it — or the restored
+            // caption is clipped off the top of the screen. A hidden window keeps its state for the next show.
+            if (!frameless && shown && (minimized || maximized || full))
+                overrideWindowState(Qt::WindowNoState);
+            Qt::WindowFlags flags = windowFlags();
+            flags.setFlag(Qt::FramelessWindowHint, frameless);
+            if (!frameless) {
+                flags.setFlag(Qt::CustomizeWindowHint, false);
+                flags |= Qt::Window | Qt::WindowTitleHint | Qt::WindowSystemMenuHint
+                    | Qt::WindowMinimizeButtonHint | Qt::WindowMaximizeButtonHint | Qt::WindowCloseButtonHint;
+            }
+            setWindowFlags(flags);
+            if (shown) {
+                if (full) showFullScreen();
+                else if (maximized) showMaximized();
+                else show();
+                // Minimized-from-maximized keeps both bits; showMinimized() does not clear them.
+                if (minimized) showMinimized();
+            }
+            // After show(): a corner preference set on the pre-show handle is lost when the window is created.
+            if (frameless) Mikan::roundCorners(this, false);
+#ifdef Q_OS_WIN
+            else if (shown) repairNativeCaption(this);
+#endif
+            if (!frameless) {
+                // Recreating the window drops the theme that was just applied. Apply it again once
+                // the new frame has settled. That restyle posts its own polish, so the caption is
+                // put back on the turn after, once those events have run.
+                QTimer::singleShot(0, this, [this] {
+                    if (Mikan::active()) return;
+                    const QString theme = themeManager()->current_theme;
+                    if (!Mikan::isTheme(theme)) themeManager()->ApplyTheme(theme, true);
+#ifdef Q_OS_WIN
+                    QTimer::singleShot(0, this, [this] {
+                        if (!Mikan::active() && !windowFlags().testFlag(Qt::FramelessWindowHint))
+                            repairNativeCaption(this);
+                    });
+#endif
+                });
+            }
+        }
     }
     if (cover) {
         cover->raise();

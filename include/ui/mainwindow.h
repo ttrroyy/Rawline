@@ -248,6 +248,8 @@ private:
     MikanHome *mikanHome = nullptr;
     // Shows the classic or the new interface, as the theme asks.
     void applyInterfaceStyle(bool animated);
+    // A dialog is open, so the frame change waits until it has closed.
+    bool m_frameChangeDeferred = false;
     QElapsedTimer sinceWindowDeactivated;
     ProfilesTableModel *profilesTableModel = nullptr;
 

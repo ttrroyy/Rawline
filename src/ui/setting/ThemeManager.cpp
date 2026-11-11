@@ -5,8 +5,6 @@
 #include <QPalette>
 #include <QColor>
 #include <QMap>
-#include <QTimer>
-
 #ifdef Q_OS_MACOS
 #include <QEvent>
 #include <QFormLayout>
@@ -411,12 +409,6 @@ void ThemeManager::ApplyTheme(const QString &theme, bool force) {
     for (const auto pixmap : {QStyle::SP_MessageBoxCritical, QStyle::SP_MessageBoxWarning}) standardIcon(pixmap);
 
     emit themeChanged(theme);
-
-    // Leaving the new look also re-creates the window without its own frame; applying the classic theme once more
-    // after that, on a settled window, gives it exactly the state a start with this theme gives.
-    if (leavingNew && !enteringNew) {
-        QTimer::singleShot(0, this, [this, theme] { if (current_theme == theme) ApplyTheme(theme, true); });
-    }
 }
 
 QIcon ThemeManager::standardIcon(QStyle::StandardPixmap pixmap) {

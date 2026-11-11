@@ -14939,6 +14939,10 @@ connection</source>
         <translation>Группа</translation>
     </message>
     <message>
+        <source>Groups</source>
+        <translation>Группы</translation>
+    </message>
+    <message>
         <source>Subscription</source>
         <translation>Подписка</translation>
     </message>
