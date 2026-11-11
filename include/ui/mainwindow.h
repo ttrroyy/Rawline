@@ -87,13 +87,13 @@ enum class RefreshAnchor {
 
 using ExitReason = Engine::ExitReason;
 
-class NewHome;
+class MikanHome;
 class QStackedWidget;
 
 class MainWindow : public QMainWindow, public Engine::EnginePolicy, public Engine::TestObserver {
     Q_OBJECT
-    // The new interface lays out the same actions, menus and models as this window.
-    friend class NewHome;
+    // The Mikan interface lays out the same actions, menus and models as this window.
+    friend class MikanHome;
 
 public:
     using ConnectionState = Engine::ConnectionState;
@@ -245,7 +245,7 @@ private:
     Ui::MainWindow *ui;
     SeasonalDecoration *seasonalDecoration = nullptr;
     QStackedWidget *rootStack = nullptr;
-    NewHome *newHome = nullptr;
+    MikanHome *mikanHome = nullptr;
     // Shows the classic or the new interface, as the theme asks.
     void applyInterfaceStyle(bool animated);
     QElapsedTimer sinceWindowDeactivated;

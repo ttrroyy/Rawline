@@ -3,7 +3,7 @@
 #include "include/ui/widget/json/JsonEditorDialog.h"
 #include "include/ui/widget/json/SchemaStore.h"
 #include "include/ui/setting/ThemeManager.hpp"
-#include "include/ui/widget/NewHome.hpp"
+#include "include/ui/widget/MikanHome.hpp"
 #include "include/ui/setting/Icon.hpp"
 #include "include/ui/utils/GuiUtils.hpp"
 #include "include/global/Configs.hpp"
@@ -365,8 +365,8 @@ DialogBasicSettings::DialogBasicSettings(QWidget *parent)
     // Custom stylesheet themes, not QStyleFactory keys.
     ui->theme->addItems({"FlatGray", "LightBlue", "SoftPink", "BlackSoft"});
     // The new interface: the mobile app's look, in its two themes.
-    ui->theme->addItem(tr("Rawline OLED"), QString::fromLatin1(NewStyle::OledTheme));
-    ui->theme->addItem(tr("Rawline White"), QString::fromLatin1(NewStyle::WhiteTheme));
+    ui->theme->addItem(tr("Mikan-like dark"), QString::fromLatin1(Mikan::DarkTheme));
+    ui->theme->addItem(tr("Mikan-like light"), QString::fromLatin1(Mikan::LightTheme));
     ui->enable_custom_icon->setChecked(Configs::dataManager->settingsRepo->use_custom_icons);
     ui->follow_status_in_taskbar->setChecked(Configs::dataManager->settingsRepo->follow_status_in_taskbar);
     ui->follow_status_in_taskbar->setEnabled(ui->enable_custom_icon->isChecked());
@@ -407,13 +407,13 @@ DialogBasicSettings::DialogBasicSettings(QWidget *parent)
     auto themeId = Configs::dataManager->settingsRepo->theme.toInt(&ok);
     if (ok) {
         ui->theme->setCurrentIndex(themeId);
-    } else if (NewStyle::isTheme(Configs::dataManager->settingsRepo->theme)) {
+    } else if (Mikan::isTheme(Configs::dataManager->settingsRepo->theme)) {
         ui->theme->setCurrentIndex(ui->theme->findData(Configs::dataManager->settingsRepo->theme));
     } else {
         ui->theme->setCurrentText(Configs::dataManager->settingsRepo->theme);
     }
     // The new interface has no seasonal decoration.
-    const auto syncDecoration = [this] { ui->seasonal_decoration->setEnabled(!NewStyle::isTheme(ui->theme->currentData().toString())); };
+    const auto syncDecoration = [this] { ui->seasonal_decoration->setEnabled(!Mikan::isTheme(ui->theme->currentData().toString())); };
     syncDecoration();
     connect(ui->theme, &QComboBox::currentIndexChanged, this, [=,this](int index) {
         // A new-interface item carries its key; the rest are named by their text.

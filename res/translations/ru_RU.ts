@@ -351,12 +351,12 @@ It stays a preference, not a lock: if that profile stops working the selector st
 <context>
     <name>DialogBasicSettings</name>
     <message>
-        <source>Rawline OLED</source>
-        <translation>Rawline OLED</translation>
+        <source>Mikan-like dark</source>
+        <translation>Mikan-like dark</translation>
     </message>
     <message>
-        <source>Rawline White</source>
-        <translation>Rawline White</translation>
+        <source>Mikan-like light</source>
+        <translation>Mikan-like light</translation>
     </message>
     <message>
         <source>Basic Settings</source>
@@ -14811,7 +14811,7 @@ Remove that endpoint from this routing profile as well?</source>
     </message>
 </context>
 <context>
-    <name>NewHome</name>
+    <name>MikanHome</name>
     <message>
         <source>Click to connect</source>
         <translation>Нажмите для подключения</translation>
@@ -14985,6 +14985,122 @@ connection</source>
     <message>
         <source>Stop sorting</source>
         <translation>Не сортировать</translation>
+    </message>
+    <message>
+        <source>Details</source>
+        <translation>Подробнее</translation>
+    </message>
+    <message>
+        <source>Overview</source>
+        <translation>Обзор</translation>
+    </message>
+    <message>
+        <source>Servers, log and traffic</source>
+        <translation>Серверы, журнал и трафик</translation>
+    </message>
+    <message>
+        <source>Profile</source>
+        <translation>Профиль</translation>
+    </message>
+    <message>
+        <source>Route traffic through a virtual adapter</source>
+        <translation>Направлять трафик через виртуальный адаптер</translation>
+    </message>
+    <message>
+        <source>Send system traffic through the proxy</source>
+        <translation>Направлять системный трафик через прокси</translation>
+    </message>
+    <message>
+        <source>Traffic Statistics</source>
+        <translation>Статистика трафика</translation>
+    </message>
+    <message>
+        <source>Connection Info</source>
+        <translation>Сведения о подключении</translation>
+    </message>
+    <message>
+        <source>Server</source>
+        <translation>Сервер</translation>
+    </message>
+    <message>
+        <source>Latency</source>
+        <translation>Задержка</translation>
+    </message>
+    <message>
+        <source>Protocol</source>
+        <translation>Протокол</translation>
+    </message>
+    <message>
+        <source>Transport</source>
+        <translation>Транспорт</translation>
+    </message>
+    <message>
+        <source>Uptime</source>
+        <translation>Время работы</translation>
+    </message>
+    <message>
+        <source>Inbound</source>
+        <translation>Прослушивание</translation>
+    </message>
+    <message>
+        <source>Download</source>
+        <translation>Загрузка</translation>
+    </message>
+    <message>
+        <source>Upload</source>
+        <translation>Отдача</translation>
+    </message>
+    <message>
+        <source>1h</source>
+        <translation>1 ч</translation>
+    </message>
+    <message>
+        <source>24h</source>
+        <translation>24 ч</translation>
+    </message>
+    <message>
+        <source>7d</source>
+        <translation>7 д</translation>
+    </message>
+    <message>
+        <source>via %1</source>
+        <translation>через %1</translation>
+    </message>
+    <message>
+        <source>Check connection</source>
+        <translation>Проверить подключение</translation>
+    </message>
+    <message>
+        <source>Checking…</source>
+        <translation>Проверка…</translation>
+    </message>
+    <message>
+        <source>On</source>
+        <translation>Вкл</translation>
+    </message>
+    <message>
+        <source>Off</source>
+        <translation>Выкл</translation>
+    </message>
+    <message>
+        <source>Local group</source>
+        <translation>Локальная группа</translation>
+    </message>
+    <message>
+        <source>Logs, connections and statistics</source>
+        <translation>Журнал, подключения и статистика</translation>
+    </message>
+    <message>
+        <source>Back</source>
+        <translation>Назад</translation>
+    </message>
+    <message>
+        <source>Subscription settings</source>
+        <translation>Настройки подписки</translation>
+    </message>
+    <message>
+        <source>%1 selected</source>
+        <translation>Выбрано: %1</translation>
     </message>
 </context>
 </TS>

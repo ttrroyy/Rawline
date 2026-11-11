@@ -1,5 +1,5 @@
 <RCC>
-    <qresource prefix="/newstyle">
+    <qresource prefix="/mikan">
         <file alias="font/geologica_regular.ttf">font/geologica_regular.ttf</file>
         <file alias="font/geologica_medium.ttf">font/geologica_medium.ttf</file>
         <file alias="font/geologica_bold.ttf">font/geologica_bold.ttf</file>

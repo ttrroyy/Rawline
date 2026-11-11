@@ -42,7 +42,7 @@
 #include "include/ui/stats/RuntimeStatsWidget.h"
 #include "include/ui/widget/LiveChart.h"
 #include "include/ui/widget/StartStopButton.hpp"
-#include "include/ui/widget/NewHome.hpp"
+#include "include/ui/widget/MikanHome.hpp"
 
 #include "include/configs/generate.h"
 #include "include/database/GroupsRepo.h"
@@ -84,7 +84,7 @@ MainWindow *UI_InitMainWindow() {
 }
 
 static bool themeUsesDarkLog(const QString &theme) {
-    if (NewStyle::isTheme(theme)) return !NewStyle::light();
+    if (Mikan::isTheme(theme)) return !Mikan::light();
     const auto lower = theme.toLower();
     if (lower.contains("vista") || lower.contains("flatgray") || lower.contains("lightblue") || lower.contains("softpink")) {
         return false;
@@ -192,9 +192,14 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWi
     UrlScheme_RegisterIfNeeded();
 
     bool isNum;
-    Configs::dataManager->settingsRepo->theme.toInt(&isNum);
+    auto &theme = Configs::dataManager->settingsRepo->theme;
+    theme.toInt(&isNum);
     if (isNum) {
-        Configs::dataManager->settingsRepo->theme = "System";
+        theme = QStringLiteral("System");
+    } else if (theme == QLatin1String(Mikan::LegacyLightTheme)) {
+        theme = QString::fromLatin1(Mikan::LightTheme);
+    } else if (theme == QLatin1String(Mikan::LegacyDarkTheme)) {
+        theme = QString::fromLatin1(Mikan::DarkTheme);
     }
     themeManager()->ApplyTheme(Configs::dataManager->settingsRepo->theme);
     ui->setupUi(this);
