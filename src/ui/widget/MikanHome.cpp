@@ -1197,9 +1197,22 @@ namespace {
     public:
         explicit GlassCard(qreal radius, QWidget *parent = nullptr) : QWidget(parent), m_radius(radius) { clearPlate(this); }
     protected:
+        // A bar drawn on another card. Its square corners must continue that card, not the window gradient.
+        GlassCard *plateBehind() const {
+            for (QWidget *widget = parentWidget(); widget; widget = widget->parentWidget())
+                if (auto *card = dynamic_cast<GlassCard *>(widget)) return card;
+            return nullptr;
+        }
         void paintEvent(QPaintEvent *) override {
             QPainter p(this);
             paintBackdropSlice(p, this);
+            if (GlassCard *plate = plateBehind()) {
+                const QPoint origin = mapTo(plate, QPoint(0, 0));
+                p.save();
+                p.translate(-origin);
+                Mikan::paintGlass(p, QRectF(plate->rect()), plate->m_radius);
+                p.restore();
+            }
             Mikan::paintGlass(p, rect(), m_radius);
         }
     private:
@@ -2569,6 +2582,7 @@ void MikanHome::buildServerList(QVBoxLayout *serversLayout) {
     serversLayout->addLayout(title);
 
     m_traffic = new QWidget;
+    clearPlate(m_traffic);
     auto *traffic = new QHBoxLayout(m_traffic);
     traffic->setContentsMargins(12, 0, 12, 8);
     traffic->setSpacing(8);
@@ -2586,7 +2600,8 @@ void MikanHome::buildServerList(QVBoxLayout *serversLayout) {
     m_quota = label({}, 11, false);
     m_quota->setAlignment(Qt::AlignCenter);
     m_quota->setFixedHeight(28);
-    m_quota->setStyleSheet(QStringLiteral("QLabel { border-radius: 14px; padding: 0 8px; }"));
+    // A stylesheet radius paints the label's square corners in the palette pink, over the glass pill.
+    m_quota->setContentsMargins(8, 0, 8, 0);
     auto *bar = new GlassCard(14);
     auto *barLayout = new QHBoxLayout(bar);
     barLayout->setContentsMargins(0, 0, 0, 0);
