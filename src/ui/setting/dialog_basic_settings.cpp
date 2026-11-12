@@ -18,6 +18,8 @@
 #include "include/ui/utils/ValidationForm.h"
 
 #include <QStyleFactory>
+#include <QPainter>
+#include <QIcon>
 #include <QFileDialog>
 #include <QInputDialog>
 #include <QMessageBox>
@@ -372,6 +374,37 @@ DialogBasicSettings::DialogBasicSettings(QWidget *parent)
     ui->theme->insertItem(1, tr("Rawline White"), QString::fromLatin1(NewStyle::WhiteTheme));
     ui->theme->insertItem(2, tr("Mikan-like dark"), QString::fromLatin1(Mikan::DarkTheme));
     ui->theme->insertItem(3, tr("Mikan-like light"), QString::fromLatin1(Mikan::LightTheme));
+    ui->gridLayout_10->setColumnStretch(1, 1);
+    ui->gridLayout_10->setColumnStretch(2, 1);
+    ui->gridLayout_5->setRowStretch(4, 1);
+    for (int i = 0; i < Mikan::accentCount(); ++i)
+        ui->accent->addItem(tr(Mikan::accentLabel(i)), QString::fromLatin1(Mikan::accentId(i)));
+    const auto refreshAccentSwatches = [this] {
+        const bool day = qApp->palette().color(QPalette::Window).lightness() > 140;
+        for (int i = 0; i < ui->accent->count(); ++i) {
+            const QColor color = Mikan::accentPreview(ui->accent->itemData(i).toString(), day);
+            const qreal dpr = qApp->devicePixelRatio();
+            QPixmap pix(qRound(16 * dpr), qRound(16 * dpr));
+            pix.setDevicePixelRatio(dpr);
+            pix.fill(Qt::transparent);
+            QPainter painter(&pix);
+            painter.setRenderHint(QPainter::Antialiasing);
+            painter.setPen(QPen(QColor(0, 0, 0, 45), 1));
+            painter.setBrush(color);
+            painter.drawEllipse(QRectF(1.5, 1.5, 13, 13));
+            ui->accent->setItemIcon(i, pix);
+        }
+    };
+    const int accentIndex = ui->accent->findData(Configs::dataManager->settingsRepo->accent);
+    ui->accent->setCurrentIndex(accentIndex >= 0 ? accentIndex : 0);
+    refreshAccentSwatches();
+    connect(ui->accent, &QComboBox::currentIndexChanged, this, [this, refreshAccentSwatches](int) {
+        Configs::dataManager->settingsRepo->accent = ui->accent->currentData().toString();
+        Configs::dataManager->settingsRepo->Save();
+        themeManager()->ApplyTheme(Configs::dataManager->settingsRepo->theme, true);
+        refreshAccentSwatches();
+        for (auto *widget : qApp->allWidgets()) widget->update();
+    });
     ui->enable_custom_icon->setChecked(Configs::dataManager->settingsRepo->use_custom_icons);
     ui->follow_status_in_taskbar->setChecked(Configs::dataManager->settingsRepo->follow_status_in_taskbar);
     ui->follow_status_in_taskbar->setEnabled(ui->enable_custom_icon->isChecked());
@@ -418,19 +451,27 @@ DialogBasicSettings::DialogBasicSettings(QWidget *parent)
     } else {
         ui->theme->setCurrentText(Configs::dataManager->settingsRepo->theme);
     }
-    // The new interface has no seasonal decoration.
+    // The new interface has no seasonal decoration. Accent belongs to the Mikan themes.
     const auto syncDecoration = [this] {
         const QString key = ui->theme->currentData().toString();
         ui->seasonal_decoration->setEnabled(!NewStyle::isTheme(key) && !Mikan::isTheme(key));
     };
+    const auto syncAccent = [this] {
+        const bool mikan = Mikan::isTheme(ui->theme->currentData().toString());
+        ui->label_accent->setVisible(mikan);
+        ui->accent->setVisible(mikan);
+    };
     syncDecoration();
+    syncAccent();
     connect(ui->theme, &QComboBox::currentIndexChanged, this, [=,this](int index) {
         // A new-interface item carries its key; the rest are named by their text.
         const QString theme = ui->theme->currentData().isValid() ? ui->theme->currentData().toString() : ui->theme->currentText().trimmed();
         syncDecoration();
+        syncAccent();
         themeManager()->ApplyTheme(theme);
         Configs::dataManager->settingsRepo->theme = theme;
         Configs::dataManager->settingsRepo->Save();
+        refreshAccentSwatches();
         refreshUrlSchemeStatus();
     });
 
@@ -693,6 +734,7 @@ QJsonObject DialogBasicSettings::formStateWithoutDecoration() const {
         if (widget == ui->seasonal_decoration || ui->seasonal_decoration->isAncestorOf(widget)) continue;
         // The theme applies at once and touches no connection, so it asks for no restart.
         if (widget == ui->theme || ui->theme->isAncestorOf(widget)) continue;
+        if (widget == ui->accent || ui->accent->isAncestorOf(widget)) continue;
         const auto key = widget->objectName();
         if (key.isEmpty()) continue;
         if (auto *combo = qobject_cast<QComboBox *>(widget)) {

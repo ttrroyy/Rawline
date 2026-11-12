@@ -37,6 +37,24 @@ namespace Mikan {
     QColor outline();
     QColor overlay(int alpha);
 
+    // One chosen accent, with a separate shade for light and dark themes.
+    struct Accent {
+        QColor mark;
+        QColor text;
+        QColor wash;
+        QColor plate;
+        QColor bubble;
+        QColor glow;
+        QColor highlight;
+        QColor shine;
+        QColor shade;
+    };
+    Accent accent();
+    int accentCount();
+    const char *accentId(int index);
+    const char *accentLabel(int index);
+    QColor accentPreview(const QString &id, bool day);
+
     QPalette palette();
     QString styleSheet();
     // Geologica, the mobile app's typeface; registered once.
@@ -140,8 +158,9 @@ private:
     QVariantAnimation *m_anim = nullptr;
 };
 
-// The new style's connect button: a disc whose edge is a slow wave, rings leaving it while connected,
-// a stroke running round it while connecting.
+// The connect button, filled with the chosen accent. While connecting, the disc swells
+// and a stroke eases round it. Once connected, the glow breathes. The card behind it
+// draws the drifting waves and the ring that leaves the disc.
 class MikanOrb : public QAbstractButton {
 public:
     explicit MikanOrb(QWidget *parent = nullptr);
@@ -158,15 +177,20 @@ protected:
 
 private:
     void animatePress(qreal to, int duration);
+    void swellTo(qreal to);
+    void syncMotion();
     bool m_connected = false;
     bool m_connecting = false;
     QString m_status;
     QString m_elapsed;
     qreal m_wave = .3, m_spin = 0, m_lit = 0, m_angle = 0, m_phase = 0, m_pressScale = 1;
+    qreal m_swell = 1;
+    qreal m_breath = 0;
     qint64 m_lastFrame = 0;
     QElapsedTimer m_clock;
     QTimer *m_frame = nullptr;
     QVariantAnimation *m_pressAnim = nullptr;
+    QVariantAnimation *m_swellAnim = nullptr;
 };
 
 // Close, maximise and minimise in the window's own style.
@@ -264,6 +288,7 @@ private:
 
     MikanTitleBar *m_titleBar = nullptr;
     MikanOrb *m_orb = nullptr;
+    QWidget *m_hero = nullptr;
     MikanTile *m_chip = nullptr;
     MikanTile *m_more = nullptr;
     MikanTile *m_add = nullptr;

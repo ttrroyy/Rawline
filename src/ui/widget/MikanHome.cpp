@@ -4,6 +4,7 @@
 
 #include "include/ui/mainwindow.h"
 #include "include/ui/mainWindow/MainWindowInternal.h"
+#include "include/global/Configs.hpp"
 #include "include/ui/setting/ThemeManager.hpp"
 #include "include/ui/utils/ProfilesTableModel.h"
 #include "include/ui/widget/StartStopButton.hpp"
@@ -15,6 +16,7 @@
 #include "include/engine/tests/TestRunner.h"
 #include "include/global/Utils.hpp"
 
+#include <QAbstractAnimation>
 #include <QApplication>
 #include <QClipboard>
 #include <QComboBox>
@@ -415,6 +417,72 @@ QColor Mikan::solid() { return light() ? QColor(255, 255, 255) : QColor(22, 22, 
 QColor Mikan::outline() { return withAlpha(muted(), 55); }
 QColor Mikan::overlay(int alpha) { return light() ? QColor(0, 0, 0, alpha / 2) : QColor(255, 255, 255, alpha); }
 
+namespace {
+struct AccentDef {
+    const char *id;
+    const char *label;
+    Mikan::Accent day;
+    Mikan::Accent night;
+};
+
+// Day ramp, then night ramp. Marks and text stay readable on the theme background.
+// Shine and shade are the power button and the badge: deep enough for a white mark.
+const AccentDef kAccents[] = {
+    {"violet", "Violet",
+     {{109, 74, 224}, {91, 56, 196}, {236, 230, 255}, {230, 222, 255}, {240, 236, 255}, {156, 128, 255}, {236, 230, 255}, {140, 112, 236}, {72, 44, 168}},
+     {{168, 146, 255}, {206, 192, 255}, {46, 38, 82}, {52, 44, 92}, {48, 40, 86}, {168, 146, 255}, {44, 40, 62}, {142, 120, 228}, {76, 46, 176}}},
+    {"indigo", "Indigo",
+     {{64, 70, 214}, {50, 54, 184}, {230, 232, 255}, {224, 226, 255}, {236, 237, 255}, {129, 140, 248}, {230, 232, 255}, {118, 128, 236}, {46, 48, 168}},
+     {{160, 168, 255}, {198, 204, 255}, {36, 38, 82}, {42, 44, 92}, {38, 40, 86}, {160, 168, 255}, {40, 42, 64}, {124, 132, 224}, {52, 56, 180}}},
+    {"blue", "Blue",
+     {{32, 92, 220}, {24, 74, 190}, {226, 236, 255}, {220, 232, 255}, {232, 241, 255}, {96, 165, 250}, {226, 236, 255}, {96, 150, 240}, {24, 64, 176}},
+     {{120, 176, 255}, {176, 208, 255}, {28, 44, 82}, {34, 52, 92}, {30, 48, 86}, {120, 176, 255}, {36, 46, 64}, {108, 158, 232}, {30, 78, 190}}},
+    {"cyan", "Cyan",
+     {{0, 108, 150}, {0, 90, 128}, {220, 244, 252}, {214, 240, 250}, {228, 246, 252}, {40, 180, 220}, {220, 244, 252}, {40, 168, 210}, {0, 82, 122}},
+     {{72, 198, 230}, {150, 224, 240}, {16, 48, 64}, {20, 56, 74}, {18, 52, 68}, {72, 198, 230}, {28, 46, 54}, {90, 200, 230}, {0, 100, 140}}},
+    {"teal", "Teal",
+     {{0, 116, 104}, {0, 96, 86}, {214, 244, 238}, {206, 240, 234}, {224, 248, 242}, {48, 190, 172}, {214, 244, 238}, {36, 176, 160}, {0, 90, 80}},
+     {{64, 204, 188}, {150, 230, 218}, {12, 48, 44}, {16, 56, 52}, {14, 52, 48}, {64, 204, 188}, {24, 46, 44}, {80, 206, 190}, {0, 108, 96}}},
+    {"green", "Green",
+     {{8, 118, 64}, {6, 96, 52}, {214, 244, 226}, {206, 240, 220}, {224, 248, 232}, {48, 186, 116}, {214, 244, 226}, {40, 176, 108}, {4, 90, 50}},
+     {{64, 204, 128}, {156, 226, 180}, {12, 48, 30}, {16, 56, 36}, {14, 52, 32}, {64, 204, 128}, {24, 46, 34}, {86, 206, 140}, {8, 112, 64}}},
+    {"amber", "Amber",
+     {{156, 96, 0}, {128, 76, 0}, {255, 240, 214}, {255, 236, 204}, {255, 244, 224}, {220, 164, 48}, {255, 240, 214}, {214, 156, 32}, {120, 72, 0}},
+     {{240, 180, 64}, {255, 214, 140}, {64, 44, 16}, {74, 50, 18}, {68, 46, 16}, {240, 180, 64}, {52, 44, 32}, {220, 168, 56}, {140, 84, 0}}},
+    {"orange", "Orange",
+     {{186, 72, 8}, {156, 56, 0}, {255, 234, 220}, {255, 228, 210}, {255, 238, 226}, {230, 130, 50}, {255, 234, 220}, {220, 120, 40}, {140, 48, 0}},
+     {{250, 150, 72}, {255, 196, 140}, {64, 32, 16}, {74, 38, 18}, {68, 34, 16}, {250, 150, 72}, {54, 40, 32}, {230, 140, 60}, {160, 58, 8}}},
+    {"rose", "Rose",
+     {{184, 36, 88}, {156, 24, 72}, {255, 228, 236}, {255, 222, 232}, {255, 234, 240}, {230, 110, 150}, {255, 228, 236}, {220, 100, 140}, {136, 20, 64}},
+     {{246, 130, 168}, {255, 186, 206}, {64, 24, 40}, {74, 28, 46}, {68, 26, 42}, {246, 130, 168}, {52, 36, 44}, {230, 128, 164}, {156, 28, 76}}},
+    {"red", "Red",
+     {{184, 32, 40}, {156, 22, 28}, {255, 228, 228}, {255, 222, 222}, {255, 234, 232}, {230, 100, 104}, {255, 228, 228}, {220, 96, 100}, {140, 20, 26}},
+     {{246, 128, 124}, {255, 188, 184}, {64, 22, 24}, {74, 26, 28}, {68, 24, 26}, {246, 128, 124}, {52, 36, 36}, {228, 116, 112}, {158, 28, 32}}},
+};
+
+const AccentDef &accentDef(const QString &id) {
+    for (const auto &item : kAccents)
+        if (id == QLatin1String(item.id)) return item;
+    return kAccents[0];
+}
+}
+
+Mikan::Accent Mikan::accent() {
+    QString id = QStringLiteral("violet");
+    if (Configs::dataManager && Configs::dataManager->settingsRepo && !Configs::dataManager->settingsRepo->accent.isEmpty())
+        id = Configs::dataManager->settingsRepo->accent;
+    const auto &item = accentDef(id);
+    return light() ? item.day : item.night;
+}
+
+int Mikan::accentCount() { return int(sizeof kAccents / sizeof kAccents[0]); }
+const char *Mikan::accentId(int index) { return kAccents[index].id; }
+const char *Mikan::accentLabel(int index) { return kAccents[index].label; }
+QColor Mikan::accentPreview(const QString &id, bool day) {
+    const auto &item = accentDef(id);
+    return (day ? item.day : item.night).mark;
+}
+
 QString Mikan::fontFamily() {
     if (g_family.isEmpty()) {
         for (const auto *weight : {"regular", "medium", "bold"}) {
@@ -435,6 +503,7 @@ QFont Mikan::font(qreal px, int weight) {
 
 QPalette Mikan::palette() {
     const QColor bg = background(), ink = text(), dim = muted();
+    const Accent tone = accent();
     QPalette p;
     for (auto group : {QPalette::Active, QPalette::Inactive, QPalette::Disabled}) {
         p.setColor(group, QPalette::Window, bg);
@@ -447,10 +516,10 @@ QPalette Mikan::palette() {
         p.setColor(group, QPalette::BrightText, bg);
         p.setColor(group, QPalette::ToolTipBase, solid());
         p.setColor(group, QPalette::ToolTipText, ink);
-        p.setColor(group, QPalette::Highlight, light() ? QColor(228, 222, 255) : QColor(52, 52, 58));
+        p.setColor(group, QPalette::Highlight, tone.highlight);
         p.setColor(group, QPalette::HighlightedText, ink);
-        p.setColor(group, QPalette::Link, light() ? QColor(110, 92, 220) : QColor(170, 160, 255));
-        p.setColor(group, QPalette::LinkVisited, light() ? QColor(110, 92, 220) : QColor(170, 160, 255));
+        p.setColor(group, QPalette::Link, tone.text);
+        p.setColor(group, QPalette::LinkVisited, tone.text);
         p.setColor(group, QPalette::PlaceholderText, dim);
         p.setColor(group, QPalette::Light, solid().lighter(130));
         p.setColor(group, QPalette::Midlight, solid().lighter(115));
@@ -458,7 +527,7 @@ QPalette Mikan::palette() {
         p.setColor(group, QPalette::Dark, dim);
         p.setColor(group, QPalette::Shadow, bg);
 #if QT_VERSION >= QT_VERSION_CHECK(6, 6, 0)
-        p.setColor(group, QPalette::Accent, ink);
+        p.setColor(group, QPalette::Accent, tone.mark);
 #endif
     }
     for (auto role : {QPalette::WindowText, QPalette::Text, QPalette::ButtonText, QPalette::HighlightedText}) {
@@ -473,12 +542,13 @@ QString Mikan::styleSheet() {
     };
     const bool day = light();
     const QColor ink = text(), dim = muted(), line = outline();
+    const Accent tone = accent();
     const QColor glassTop = day ? QColor(255, 255, 255, 236) : QColor(255, 255, 255, 16);
     const QColor glassBottom = day ? QColor(255, 252, 255, 214) : QColor(255, 255, 255, 10);
     const QColor rim = day ? QColor(0, 0, 0, 22) : QColor(255, 255, 255, 26);
     const QColor well = day ? QColor(0, 0, 0, 10) : QColor(255, 255, 255, 14);
     const QColor hover = overlay(22), press = overlay(44);
-    const QColor tint = withAlpha(ink, day ? 30 : 40), tintRim = withAlpha(ink, 90);
+    const QColor tint = withAlpha(tone.glow, day ? 70 : 110), tintRim = tone.glow;
     const QColor menu = day ? QColor(250, 250, 252) : QColor(22, 22, 28);
     const QString glass = QStringLiteral("qlineargradient(x1:0,y1:0,x2:0,y2:1,stop:0 %1,stop:1 %2)").arg(rgba(glassTop), rgba(glassBottom));
     return QStringLiteral(
@@ -526,11 +596,11 @@ QString Mikan::styleSheet() {
         "QSplitter::handle { background: transparent; }\n"
         "#stats_widget::pane { border: none; }\n"
         "QLabel[mikanRole=\"muted\"] { color: %7; }\n"
-        "QLabel[mikanRole=\"link\"] { color: %7; }\n"
+        "QLabel[mikanRole=\"link\"] { color: %11; }\n"
         "QLabel[mikanRole=\"link\"]:hover { color: %3; }\n"
         "QWidget#mikanCard { background: transparent; }\n"
     ).arg(rgba(background()), rgba(solid()), rgba(ink), rgba(line), rgba(menu), rgba(hover), rgba(dim), glass, rgba(rim))
-     .arg(rgba(press), rgba(withAlpha(ink, 120)), rgba(well), rgba(tint), rgba(tintRim), rgba(withAlpha(dim, 110)));
+     .arg(rgba(press), rgba(tone.text), rgba(well), rgba(tint), rgba(tintRim), rgba(withAlpha(dim, 110)));
 }
 
 void Mikan::paintBackdrop(QPainter &p, const QRect &r) {
@@ -762,16 +832,16 @@ void MikanTile::paintEvent(QPaintEvent *) {
     if (m_filled) {
         // Opaque: a tinted glass plate composites through a translucent popup and the label disappears.
         p.setPen(QPen(Mikan::light() ? QColor(0, 0, 0, 28) : QColor(255, 255, 255, 32), 1));
-        p.setBrush(m_selected ? (Mikan::light() ? QColor(232, 226, 255) : QColor(62, 56, 104))
+        p.setBrush(m_selected ? Mikan::accent().plate
                               : (Mikan::light() ? QColor(255, 255, 255) : QColor(32, 32, 40)));
         const qreal corner = std::min(radius, r.height() / 2);
         p.drawRoundedRect(r.adjusted(.5, .5, -.5, -.5), corner, corner);
     } else if (!m_flat) {
-        Mikan::paintGlass(p, r, radius, m_selected ? QColor(154, 140, 255) : QColor());
+        Mikan::paintGlass(p, r, radius, m_selected ? Mikan::accent().glow : QColor());
     }
     if (m_flat && m_kind == Tab && m_selected) {
         p.setPen(Qt::NoPen);
-        p.setBrush(Mikan::light() ? QColor(228, 222, 255) : QColor(58, 52, 96));
+        p.setBrush(Mikan::accent().wash);
         const QRectF pillRect = r.adjusted(0, 6, 0, -6);
         p.drawRoundedRect(pillRect, pillRect.height() / 2, pillRect.height() / 2);
     }
@@ -953,7 +1023,7 @@ void MikanSwitch::paintEvent(QPaintEvent *) {
     const QRectF r = rect();
     if (!m_bare) Mikan::paintGlass(p, r, 20);
     if (m_hover || isDown() || hasFocus()) {
-        p.setPen(hasFocus() && !m_hover ? QPen(QColor(154, 140, 255), 1.5) : Qt::NoPen);
+        p.setPen(hasFocus() && !m_hover ? QPen(Mikan::accent().glow, 1.5) : Qt::NoPen);
         p.setBrush(Mikan::overlay(isDown() ? 36 : 10));
         p.drawRoundedRect(r.adjusted(2, 2, -2, -2), 16, 16);
     }
@@ -963,10 +1033,10 @@ void MikanSwitch::paintEvent(QPaintEvent *) {
     if (!m_icon.isEmpty()) {
         const QRectF bubble(12, r.center().y() - 14, 28, 28);
         p.setPen(Qt::NoPen);
-        p.setBrush(m_on ? (Mikan::light() ? QColor(236, 232, 255) : QColor(58, 50, 96))
+        p.setBrush(m_on ? Mikan::accent().bubble
                         : (Mikan::light() ? QColor(236, 234, 242) : QColor(44, 44, 52)));
         p.drawEllipse(bubble);
-        Mikan::paintIcon(p, m_icon, bubble.adjusted(6, 6, -6, -6), m_on ? QColor(124, 108, 245) : Mikan::muted());
+        Mikan::paintIcon(p, m_icon, bubble.adjusted(6, 6, -6, -6), m_on ? Mikan::accent().mark : Mikan::muted());
         textLeft = bubble.right() + 10;
     }
     const qreal textRight = stateBox.left() - 8;
@@ -984,9 +1054,9 @@ void MikanSwitch::paintEvent(QPaintEvent *) {
         p.drawText(QRectF(textLeft, r.top() + 30, textWidth, 20), Qt::AlignLeft | Qt::AlignVCenter, p.fontMetrics().elidedText(m_description, Qt::ElideRight, int(textWidth)));
     }
     p.setFont(Mikan::font(12, QFont::DemiBold));
-    p.setPen(m_on ? QColor(124, 108, 245) : Mikan::muted());
+    p.setPen(m_on ? Mikan::accent().text : Mikan::muted());
     p.drawText(stateBox, Qt::AlignRight | Qt::AlignVCenter, m_on ? T("On") : T("Off"));
-    const QColor on(124, 108, 245);
+    const QColor on = Mikan::accent().mark;
     const QColor off = Mikan::light() ? QColor(226, 224, 236) : QColor(68, 68, 80);
     const auto mix = [this](int a, int b) { return int(std::round(a + (b - a) * m_knob)); };
     p.setPen(Qt::NoPen);
@@ -1009,14 +1079,36 @@ MikanOrb::MikanOrb(QWidget *parent) : QAbstractButton(parent) {
     m_frame = new QTimer(this);
     m_frame->setTimerType(Qt::PreciseTimer);
     connect(m_frame, &QTimer::timeout, this, [this] {
-        if (window()->isMinimized()) return;
-        m_angle = std::fmod(m_angle + 5, 360);
-        m_lastFrame = m_clock.elapsed();
+        const QWidget *top = window();
+        if (!isVisible() || !top || top->isMinimized() || (!m_connecting && !m_connected)) {
+            m_frame->stop();
+            m_lastFrame = 0;
+            return;
+        }
+        const qint64 now = m_clock.elapsed();
+        if (m_lastFrame == 0 || now - m_lastFrame > 80) {
+            m_lastFrame = now;
+            update();
+            return;
+        }
+        const double dt = double(now - m_lastFrame);
+        m_lastFrame = now;
+        // Same average speed as the old fixed step, eased around the circle so it doesn't tick.
+        if (m_connecting) {
+            const double wobble = 1.0 + 0.35 * std::sin(m_angle * 0.017453292519943295);
+            m_angle += (360.0 / 1.15) * (dt / 1000.0) * wobble;
+            if (m_angle >= 360.0) m_angle = std::fmod(m_angle, 360.0);
+        }
+        if (m_connected && !m_connecting) {
+            m_breath += dt / 3000.0;
+            if (m_breath >= 1.0) m_breath -= std::floor(m_breath);
+        }
         update();
     });
 }
 
 void MikanOrb::setState(bool connected, bool connecting, const QString &status, const QString &elapsed) {
+    const bool wasConnecting = m_connecting;
     m_connected = connected;
     m_connecting = connecting;
     m_status = status;
@@ -1024,20 +1116,49 @@ void MikanOrb::setState(bool connected, bool connecting, const QString &status, 
     m_wave = connected ? 1 : connecting ? .6 : .3;
     m_lit = connected || connecting ? 1 : 0;
     m_spin = connecting ? 1 : 0;
-    m_phase = 0;
-    if (m_connecting) {
-        if (!m_frame->isActive()) m_frame->start(16);
-    } else if (m_frame->isActive()) {
-        m_frame->stop();
-    }
+    if (connecting && !wasConnecting) swellTo(1.04);
+    else if (!connecting && wasConnecting) swellTo(1);
+    syncMotion();
     update();
 }
 
-void MikanOrb::showEvent(QShowEvent *e) {
-    if (m_connecting) m_frame->start(16);
-    QAbstractButton::showEvent(e);
+void MikanOrb::swellTo(qreal to) {
+    if (qAbs(m_swell - to) < 0.001 && !(m_swellAnim && m_swellAnim->state() == QAbstractAnimation::Running)) return;
+    if (!m_swellAnim) {
+        m_swellAnim = new QVariantAnimation(this);
+        connect(m_swellAnim, &QVariantAnimation::valueChanged, this, [this](const QVariant &v) {
+            m_swell = v.toReal();
+            update();
+        });
+    }
+    m_swellAnim->stop();
+    m_swellAnim->setDuration(to > m_swell ? 480 : 320);
+    m_swellAnim->setStartValue(m_swell);
+    m_swellAnim->setEndValue(to);
+    m_swellAnim->setEasingCurve(to > m_swell ? QEasingCurve::OutBack : QEasingCurve::OutCubic);
+    m_swellAnim->start();
 }
-void MikanOrb::hideEvent(QHideEvent *e) { m_frame->stop(); QAbstractButton::hideEvent(e); }
+
+void MikanOrb::syncMotion() {
+    const QWidget *top = window();
+    const bool live = (m_connecting || m_connected) && isVisible() && top && !top->isMinimized();
+    if (live) {
+        if (!m_frame->isActive()) m_frame->start(16);
+    } else if (m_frame->isActive()) {
+        m_frame->stop();
+        m_lastFrame = 0;
+    }
+}
+
+void MikanOrb::showEvent(QShowEvent *e) {
+    QAbstractButton::showEvent(e);
+    syncMotion();
+}
+void MikanOrb::hideEvent(QHideEvent *e) {
+    m_frame->stop();
+    m_lastFrame = 0;
+    QAbstractButton::hideEvent(e);
+}
 
 bool MikanOrb::hitButton(const QPoint &pos) const {
     const QPointF centre(width() / 2.0, height() / 2.0);
@@ -1072,46 +1193,50 @@ void MikanOrb::paintEvent(QPaintEvent *) {
     p.setRenderHint(QPainter::Antialiasing);
     if (!isEnabled()) p.setOpacity(.55);
     const QRectF bounds = QRectF(rect()).adjusted(5, 5, -5, -5);
-    const qreal side = std::min(bounds.width(), bounds.height()) * m_pressScale;
+    const qreal base = std::min(bounds.width(), bounds.height()) * m_pressScale;
+    const qreal side = base * m_swell;
     QRectF disc(0, 0, side, side);
     disc.moveCenter(bounds.center());
     const QPointF c = disc.center();
     const bool lit = m_connected || m_connecting;
+    const Mikan::Accent tone = Mikan::accent();
+    const QColor top = lit ? tone.shine : tone.mark;
+    const QColor bottom = tone.shade;
+    // The glyph sits on the middle of the disc, so a pale accent (amber, rose) gets a dark mark.
+    const int midL = (top.lightness() + bottom.lightness()) / 2;
+    const QColor ink = midL > 145 ? QColor(32, 28, 48) : QColor(255, 255, 255);
     if (lit) {
+        int glowAlpha = 62;
+        if (m_connected && !m_connecting) {
+            const double breath = 0.5 + 0.5 * std::sin(m_breath * 6.283185307179586);
+            glowAlpha = int(std::lround(40 + 30 * breath));
+        }
         QRadialGradient glow(c, side * .72);
-        glow.setColorAt(0, QColor(47, 191, 115, 70));
-        glow.setColorAt(1, QColor(47, 191, 115, 0));
+        glow.setColorAt(0, QColor(tone.glow.red(), tone.glow.green(), tone.glow.blue(), glowAlpha));
+        glow.setColorAt(1, QColor(tone.glow.red(), tone.glow.green(), tone.glow.blue(), 0));
         p.setPen(Qt::NoPen);
         p.setBrush(glow);
         p.drawEllipse(c, side * .72, side * .72);
     }
     QLinearGradient fill(disc.topLeft(), disc.bottomRight());
-    if (lit) {
-        fill.setColorAt(0, QColor(110, 224, 164));
-        fill.setColorAt(1, QColor(36, 178, 112));
-    } else if (Mikan::light()) {
-        fill.setColorAt(0, QColor(255, 255, 255));
-        fill.setColorAt(1, QColor(236, 234, 244));
-    } else {
-        fill.setColorAt(0, QColor(54, 54, 64));
-        fill.setColorAt(1, QColor(28, 28, 34));
-    }
-    p.setPen(QPen(lit ? QColor(255, 255, 255, 90) : Mikan::outline(), 1));
+    fill.setColorAt(0, top);
+    fill.setColorAt(1, bottom);
+    p.setPen(QPen(QColor(ink.red(), ink.green(), ink.blue(), midL > 145 ? 50 : 90), 1));
     p.setBrush(fill);
     p.drawEllipse(disc);
     if (m_connecting) {
         p.setBrush(Qt::NoBrush);
-        p.setPen(QPen(QColor(255, 255, 255, 230), 3, Qt::SolidLine, Qt::RoundCap));
+        p.setPen(QPen(QColor(ink.red(), ink.green(), ink.blue(), 230), 3, Qt::SolidLine, Qt::RoundCap));
         p.drawArc(disc.adjusted(-3, -3, 3, 3), int(-m_angle * 16), 100 * 16);
     }
     if (hasFocus()) {
         p.setBrush(Qt::NoBrush);
-        p.setPen(QPen(Mikan::text(), 1.5));
+        p.setPen(QPen(tone.glow, 1.5));
         p.drawEllipse(disc.adjusted(-3, -3, 3, 3));
     }
-    const QColor glyph = lit ? QColor(255, 255, 255) : Mikan::muted();
-    const qreal g = side * .2;
-    p.setPen(QPen(glyph, std::max(2.0, side * .055), Qt::SolidLine, Qt::RoundCap));
+    const QColor glyph = ink;
+    const qreal g = base * .2;
+    p.setPen(QPen(glyph, std::max(2.0, base * .055), Qt::SolidLine, Qt::RoundCap));
     p.setBrush(Qt::NoBrush);
     p.drawArc(QRectF(c.x() - g, c.y() - g * .85, g * 2, g * 2), 50 * 16, -290 * 16);
     p.drawLine(QPointF(c.x(), c.y() - g * 1.45), QPointF(c.x(), c.y() - g * .15));
@@ -1932,8 +2057,8 @@ namespace {
             QPainter p(this);
             p.setRenderHint(QPainter::Antialiasing);
             QLinearGradient g(rect().topLeft(), rect().bottomRight());
-            g.setColorAt(0, QColor(164, 148, 255));
-            g.setColorAt(1, QColor(98, 84, 224));
+            g.setColorAt(0, Mikan::accent().shine);
+            g.setColorAt(1, Mikan::accent().shade);
             p.setPen(Qt::NoPen);
             p.setBrush(g);
             p.drawRoundedRect(rect(), 8, 8);
@@ -1983,10 +2108,34 @@ namespace {
         QString m_name;
     };
 
+    // The block behind the connect button. Two shapes drift opposite each other.
+    // Idle and connected take about eight seconds a cycle; connecting is a little quicker.
+    // A soft ring leaves the disc about every 2.5 seconds once the link is up.
     class HeroCard : public QWidget {
     public:
-        explicit HeroCard(QWidget *parent = nullptr) : QWidget(parent) { clearPlate(this); }
+        explicit HeroCard(QWidget *parent = nullptr) : QWidget(parent) {
+            clearPlate(this);
+            m_clock.start();
+            m_timer = new QTimer(this);
+            m_timer->setTimerType(Qt::PreciseTimer);
+            connect(m_timer, &QTimer::timeout, this, [this] { tick(); });
+        }
+        void follow(MikanOrb *orb) { m_orb = orb; }
+        void setPace(int pace) {
+            if (pace == 2 && m_pace != 2) m_ring = 0;
+            m_pace = pace;
+            sync();
+        }
     protected:
+        void showEvent(QShowEvent *e) override {
+            QWidget::showEvent(e);
+            if (!m_timer->isActive()) m_timer->start(33);
+        }
+        void hideEvent(QHideEvent *e) override {
+            m_timer->stop();
+            m_last = 0;
+            QWidget::hideEvent(e);
+        }
         void paintEvent(QPaintEvent *) override {
             QPainter p(this);
             paintBackdropSlice(p, this);
@@ -1997,11 +2146,17 @@ namespace {
             clip.addRoundedRect(QRectF(r).adjusted(1, 1, -1, -1), 26, 26);
             p.setClipPath(clip);
             p.setPen(Qt::NoPen);
+            const qreal drift = std::sin(m_phase * 6.283185307179586) * m_amp;
+            const qreal drift2 = -drift * .85;
+            const qreal lift = m_lift;
+            const qreal base = r.right() - r.width() * .46;
+            const qreal x0 = base + drift;
             QPainterPath wave;
-            const qreal x0 = r.right() - r.width() * .46;
             wave.moveTo(x0, r.bottom());
-            wave.lineTo(x0, r.center().y() + 8);
-            wave.cubicTo(r.right() - r.width() * .30, r.center().y() - 36, r.right() - r.width() * .12, r.center().y() + 28, r.right() + 2, r.center().y() - 6);
+            wave.lineTo(x0, r.center().y() + 8 + lift);
+            wave.cubicTo(r.right() - r.width() * .30 + drift * .6, r.center().y() - 36 + lift,
+                         r.right() - r.width() * .12 + drift * .3, r.center().y() + 28 + lift * .4,
+                         r.right() + 2, r.center().y() - 6 + lift * .15);
             wave.lineTo(r.right() + 2, r.bottom());
             wave.closeSubpath();
             QLinearGradient wash(x0, r.top(), r.right(), r.bottom());
@@ -2009,16 +2164,85 @@ namespace {
             wash.setColorAt(1, QColor(150, 196, 230, Mikan::light() ? 20 : 10));
             p.setBrush(wash);
             p.drawPath(wave);
+            const qreal x2 = base + 36 + drift2;
             QPainterPath wave2;
-            wave2.moveTo(x0 + 36, r.bottom());
-            wave2.lineTo(x0 + 36, r.center().y() + 22);
-            wave2.cubicTo(r.right() - r.width() * .18, r.center().y() - 8, r.right() - 20, r.center().y() + 18, r.right() + 2, r.center().y() + 4);
+            wave2.moveTo(x2, r.bottom());
+            wave2.lineTo(x2, r.center().y() + 22 + lift);
+            wave2.cubicTo(r.right() - r.width() * .18 + drift2 * .55, r.center().y() - 8 + lift,
+                          r.right() - 20 + drift2 * .25, r.center().y() + 18 + lift * .35,
+                          r.right() + 2, r.center().y() + 4 + lift * .15);
             wave2.lineTo(r.right() + 2, r.bottom());
             wave2.closeSubpath();
             p.setBrush(QColor(186, 230, 216, Mikan::light() ? 70 : 28));
             p.drawPath(wave2);
+            if (m_pace == 2 && m_orb && m_orb->width() > 0) {
+                const QRectF orb = m_orb->geometry();
+                const qreal emerge = std::min(1.0, m_ring / 0.12);
+                const qreal fade = (1.0 - m_ring) * (1.0 - m_ring);
+                const int alpha = int(std::lround(100 * fade * emerge));
+                if (alpha > 0) {
+                    const qreal radius = (std::min(orb.width(), orb.height()) - 10) / 2.0 + 3 + m_ring * 20.0;
+                    p.setBrush(Qt::NoBrush);
+                    const QColor ring = Mikan::accent().mark;
+                    p.setPen(QPen(QColor(ring.red(), ring.green(), ring.blue(), alpha), 2));
+                    p.drawEllipse(orb.center(), radius, radius);
+                }
+            }
         }
+    private:
+        void sync() {
+            const QWidget *top = window();
+            const bool live = isVisible() && top && !top->isMinimized();
+            if (live) {
+                if (!m_timer->isActive()) m_timer->start(33);
+            } else if (m_timer->isActive()) {
+                m_timer->stop();
+                m_last = 0;
+            }
+        }
+        void tick() {
+            const QWidget *top = window();
+            if (!isVisible() || !top || top->isMinimized()) {
+                m_timer->stop();
+                m_last = 0;
+                return;
+            }
+            const qint64 now = m_clock.elapsed();
+            if (m_last == 0 || now - m_last > 80) {
+                m_last = now;
+                update();
+                return;
+            }
+            const double dt = double(now - m_last);
+            m_last = now;
+            const double period = m_pace == 1 ? 4200.0 : 8000.0;
+            m_phase += dt / period;
+            if (m_phase >= 1.0) m_phase -= std::floor(m_phase);
+            if (m_pace == 2) {
+                m_ring += dt / 2500.0;
+                if (m_ring >= 1.0) m_ring -= std::floor(m_ring);
+            }
+            const double blend = 1.0 - std::exp(-dt / 220.0);
+            const qreal targetAmp = m_pace == 1 ? 10.0 : 7.0;
+            const qreal targetLift = m_pace == 2 ? -6.0 : 0.0;
+            m_amp += (targetAmp - m_amp) * blend;
+            m_lift += (targetLift - m_lift) * blend;
+            update();
+        }
+        MikanOrb *m_orb = nullptr;
+        QTimer *m_timer = nullptr;
+        QElapsedTimer m_clock;
+        int m_pace = 0;
+        qreal m_phase = 0;
+        qreal m_ring = 0;
+        qreal m_amp = 7;
+        qreal m_lift = 0;
+        qint64 m_last = 0;
     };
+
+    void setHeroPace(QWidget *hero, int pace) {
+        if (auto *card = dynamic_cast<HeroCard *>(hero)) card->setPace(pace);
+    }
 
     QWidget *hairline() {
         auto *line = new QWidget;
@@ -2339,12 +2563,14 @@ MikanHome::MikanHome(MainWindow *window) : QWidget(nullptr), mw(window) {
 
 void MikanHome::buildHero(QVBoxLayout *root) {
     auto *hero = new HeroCard;
+    m_hero = hero;
     hero->setMinimumHeight(128);
     auto *row = new QHBoxLayout(hero);
     row->setContentsMargins(22, 16, 20, 16);
     row->setSpacing(16);
 
     m_orb = new MikanOrb;
+    hero->follow(m_orb);
     m_orb->setContextMenuPolicy(Qt::CustomContextMenu);
     connect(m_orb, &QAbstractButton::clicked, this, [this] { mw->ui->toolButton_startstop->click(); });
     connect(m_orb, &QWidget::customContextMenuRequested, this, [this] {
@@ -2782,7 +3008,7 @@ void MikanHome::updateRates(bool live) {
         return QStringLiteral("<span style=\"font-family:'%1';color:%2;font-size:15px;font-weight:600\">%3</span>&nbsp;&nbsp;<span style=\"font-family:'%4';color:%5;font-size:16px;font-weight:600\">%6</span>")
             .arg(family, color.name(), arrow, family, ink, value.toHtmlEscaped());
     };
-    if (m_up) m_up->setText(line(QStringLiteral("↑"), QColor(124, 108, 245), m_rateUp));
+    if (m_up) m_up->setText(line(QStringLiteral("↑"), Mikan::accent().mark, m_rateUp));
     if (m_down) m_down->setText(line(QStringLiteral("↓"), QColor(46, 164, 214), m_rateDown));
 }
 
@@ -2932,6 +3158,7 @@ void MikanHome::refresh() {
     const QString elapsed = QStringLiteral("%1:%2:%3").arg(seconds / 3600, 2, 10, QLatin1Char('0'))
         .arg(seconds / 60 % 60, 2, 10, QLatin1Char('0')).arg(seconds % 60, 2, 10, QLatin1Char('0'));
     m_orb->setState(connected, connecting, status, elapsed);
+    setHeroPace(m_hero, connecting ? 1 : connected ? 2 : 0);
     m_orb->setEnabled(state != StartStopButton::State::Disabled && state != StartStopButton::State::Disconnecting);
     if (m_status) m_status->setText(status.isEmpty() ? T("Click to connect") : status);
     if (m_dot) static_cast<StatusDot *>(m_dot)->setOn(connected);

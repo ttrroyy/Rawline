@@ -33,6 +33,12 @@ bool setPeer(Configs::qwdtt &o, const QString &peer) {
 QString peerString(const QString &host, int port) {
     return (host.contains(':') ? "[" + host + "]" : host) + ":" + QString::number(port);
 }
+// urlencode()-style panels send '+' for a space, which QUrlQuery keeps apart from %2B.
+QString formDecodedQueryValue(const QUrlQuery &query, const QString &key) {
+    auto raw = query.queryItemValue(key, QUrl::FullyEncoded).toUtf8();
+    raw.replace('+', "%20");
+    return QUrl::fromPercentEncoding(raw);
+}
 QString normalizedMode(const QString &m) {
     // The original app connects in its VPN (WireGuard) mode unless RAW is chosen.
     if (m.isEmpty()) return "wg";

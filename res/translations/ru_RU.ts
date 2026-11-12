@@ -495,6 +495,54 @@ It stays a preference, not a lock: if that profile stops working the selector st
         <translation>Тема</translation>
     </message>
     <message>
+        <source>Accent</source>
+        <translation>Акцент</translation>
+    </message>
+    <message>
+        <source>Color of switches, links and highlights in the Mikan themes. Light themes use the deeper shade, dark themes the brighter one.</source>
+        <translation>Цвет переключателей, ссылок и подсветок в темах Mikan. В светлых темах оттенок темнее, в тёмных — ярче.</translation>
+    </message>
+    <message>
+        <source>Violet</source>
+        <translation>Фиолетовый</translation>
+    </message>
+    <message>
+        <source>Indigo</source>
+        <translation>Индиго</translation>
+    </message>
+    <message>
+        <source>Blue</source>
+        <translation>Синий</translation>
+    </message>
+    <message>
+        <source>Cyan</source>
+        <translation>Голубой</translation>
+    </message>
+    <message>
+        <source>Teal</source>
+        <translation>Бирюзовый</translation>
+    </message>
+    <message>
+        <source>Green</source>
+        <translation>Зелёный</translation>
+    </message>
+    <message>
+        <source>Amber</source>
+        <translation>Янтарный</translation>
+    </message>
+    <message>
+        <source>Orange</source>
+        <translation>Оранжевый</translation>
+    </message>
+    <message>
+        <source>Rose</source>
+        <translation>Розовый</translation>
+    </message>
+    <message>
+        <source>Red</source>
+        <translation>Красный</translation>
+    </message>
+    <message>
         <source>Connection statistics</source>
         <translation>Статистика подключений</translation>
     </message>
