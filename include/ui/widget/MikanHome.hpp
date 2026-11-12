@@ -22,12 +22,9 @@ class QVariantAnimation;
 class QVBoxLayout;
 
 namespace Mikan {
-    // Theme keys kept in settings; anything else is the classic interface.
+    // Theme keys kept in settings. Other themes keep their own screens.
     inline constexpr auto DarkTheme = "MikanDark";
     inline constexpr auto LightTheme = "MikanLight";
-    // Previous keys. Read once at startup and rewritten to the names above.
-    inline constexpr auto LegacyDarkTheme = "NewOLED";
-    inline constexpr auto LegacyLightTheme = "NewWhite";
     bool isTheme(const QString &theme);
     void setTheme(const QString &theme);
     bool active();

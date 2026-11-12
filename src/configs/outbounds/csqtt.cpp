@@ -60,9 +60,10 @@ bool csqtt::ParseFromJson(const QJsonObject &object) {
     workers = NormalizeWorkers(object["workers"].toInt(18),hashSource == "auto" ? autoHashCount : hashes.size());
     turnTCP = object["turn_tcp"].toBool(false);
     obfs = object["obfs"].toString("unified");
-    turnTransport = object["turn_transport"].toString(turnTCP ? "tcp_tls" : "udp");
+    turnTransport = object["turn_transport"].toString(turnTCP ? "tcp_tls" : !object.contains("turn_tcp") && dataManager
+        ? dataManager->settingsRepo->relay_default_csqtt_transport : QStringLiteral("udp"));
     if (turnTransport == "tcp/tls" || turnTransport == "tcp-tls") turnTransport = "tcp_tls";
-    srtpMode = object["srtp_mode"].toString("auto");
+    srtpMode = object["srtp_mode"].toString(dataManager ? dataManager->settingsRepo->relay_default_csqtt_srtp : QStringLiteral("auto"));
     if (srtpMode == "wrap-srtp" || srtpMode == "wrap_srtp" || srtpMode == "legacy") srtpMode = "wrap";
     if (srtpMode == "dtls-srtp" || srtpMode == "dtls_srtp") srtpMode = "dtls";
     fingerprint = object["fingerprint"].toString("firefox");
@@ -133,6 +134,8 @@ bool csqtt::ParseFromLink(const QString &link) {
             object["hash_source"] = "auto_js";
             object["vk_anon_path"] = "auto_js";
         }
+        // An empty "hashes=" is a link without calls: the hashes are added in the client.
+        if (values.contains("hashes") && values["hashes"].trimmed().isEmpty()) values.remove("hashes");
         if (values.contains("hashes")) {
             QStringList list;
             const auto encodedHashes = values["hashes"].split('+').mid(0,6);

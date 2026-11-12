@@ -95,6 +95,8 @@ set(PROJECT_SOURCES
         src/main.cpp
         src/global/Configs.cpp
         src/global/Utils.cpp
+        include/global/LogBuffer.hpp
+        src/global/LogBuffer.cpp
         include/global/Validation.hpp
         src/global/Validation.cpp
         include/global/Logger.hpp
@@ -157,6 +159,11 @@ set(PROJECT_SOURCES
         src/api/remote/RouterTests.cpp
         src/api/remote/RouterManage.cpp
         src/api/remote/RouterBackup.cpp
+        src/api/remote/RouterFeeds.cpp
+        src/api/remote/RouterProfileConfig.cpp
+        src/api/remote/RouterRoutes.cpp
+        src/api/remote/RouterConnections.cpp
+        src/api/remote/RouterWarp.cpp
 
         src/stats/traffic/TrafficLooper.cpp
         include/stats/traffic/TrafficLine.hpp
@@ -175,8 +182,12 @@ set(PROJECT_SOURCES
         src/configs/sub/ImportReport.cpp
         include/configs/ParseDiagnostics.h
         src/configs/ParseDiagnostics.cpp
+        include/configs/ProcessRules.h
+        src/configs/ProcessRules.cpp
         include/configs/sub/SubscriptionReconcile.hpp
         src/configs/sub/SubscriptionReconcile.cpp
+        include/configs/sub/SubscriptionFilter.hpp
+        src/configs/sub/SubscriptionFilter.cpp
         include/configs/sub/RouteUpdater.hpp
         src/configs/sub/RouteUpdater.cpp
         src/configs/sub/clash.cpp
@@ -229,6 +240,9 @@ set(PROJECT_SOURCES
         include/ui/mainwindow.ui
         include/ui/widget/StartStopButton.hpp
         src/ui/widget/StartStopButton.cpp
+        include/ui/widget/NewHome.hpp
+        include/ui/widget/NewIcons.h
+        src/ui/widget/NewHome.cpp
         include/ui/widget/MikanHome.hpp
         include/ui/widget/MikanIcons.h
         src/ui/widget/MikanHome.cpp
@@ -248,6 +262,10 @@ set(PROJECT_SOURCES
         src/ui/widget/LiveChart.cpp
         include/ui/widget/MuxSettingsWidget.h
         src/ui/widget/MuxSettingsWidget.cpp
+        include/ui/widget/ResolverSourceWidget.h
+        src/ui/widget/ResolverSourceWidget.cpp
+        include/ui/widget/ElidingLabel.hpp
+        src/ui/widget/ElidingLabel.cpp
         include/ui/widget/json/JsonTree.h
         src/ui/widget/json/JsonTree.cpp
         include/ui/widget/json/JsonValidator.h
@@ -271,8 +289,11 @@ set(PROJECT_SOURCES
         src/ui/utils/ProfilesTableView.cpp
         include/ui/utils/ProfilesTableVerticalHeader.h
         src/ui/utils/ProfilesTableVerticalHeader.cpp
+        include/ui/utils/ServiceCheckHtml.h
+        src/ui/utils/ServiceCheckHtml.cpp
         include/ui/utils/ProfilesTableFilterHeader.h
         include/ui/utils/ConnectionsFilterHeader.h
+        include/ui/utils/HeaderSortArrow.h
         include/ui/utils/ConnectionsTreeModel.h
         src/ui/utils/ConnectionsTreeModel.cpp
         include/ui/utils/ConnectionsTreeFilterProxyModel.h
@@ -280,6 +301,7 @@ set(PROJECT_SOURCES
         include/ui/utils/ScreenQrScanner.h
         src/ui/utils/ScreenQrScanner.cpp
         include/ui/utils/NoWheelComboBox.h
+        include/ui/utils/MyPlainTextEdit.h
         include/ui/utils/GuiUtils.hpp
         include/ui/utils/ValidationForm.h
         src/ui/utils/ValidationForm.cpp
@@ -287,6 +309,8 @@ set(PROJECT_SOURCES
         src/ui/utils/CommandPalette.cpp
         include/ui/utils/SettingsIndex.h
         src/ui/utils/SettingsIndex.cpp
+        include/ui/utils/UiMode.h
+        src/ui/utils/UiMode.cpp
 
         include/ui/profile/dialog_edit_profile.h
         src/ui/profile/dialog_edit_profile.cpp
@@ -294,6 +318,7 @@ set(PROJECT_SOURCES
         src/ui/profile/dialog_edit_profile_xray.cpp
         src/ui/profile/dialog_edit_profile_xhttp.cpp
         src/ui/profile/dialog_edit_profile_xdrive.cpp
+        src/ui/profile/dialog_edit_profile_kcp.cpp
         include/ui/profile/dialog_edit_profile.ui
         include/ui/group/dialog_edit_group.h
         src/ui/group/dialog_edit_group.cpp
@@ -515,8 +540,11 @@ set(PROJECT_SOURCES
         src/ui/scanner/dialog_new_scan.cpp
         include/ui/scanner/dialog_new_scan.h
         src/ui/scanner/dialog_scan_instance.cpp
+        src/ui/scanner/dialog_scan_instance_tune.cpp
         include/ui/scanner/dialog_scan_instance.h
         include/ui/scanner/dialog_scan_instance.ui
+        include/ui/scanner/scan_phases.ui
+        include/ui/scanner/scan_tune_settings.ui
         src/ui/scanner/IpEntriesModel.cpp
         include/ui/scanner/IpEntriesModel.h
         src/ui/scanner/dialog_ip_lists.cpp
@@ -541,6 +569,12 @@ set(PROJECT_SOURCES
         src/scanner/ScanManager.cpp
         include/scanner/ScanWorker.h
         src/scanner/ScanWorker.cpp
+        include/scanner/TunePlanner.h
+        src/scanner/TunePlanner.cpp
+        include/scanner/TuneProfiles.h
+        src/scanner/TuneProfiles.cpp
+        include/scanner/TuneWorker.h
+        src/scanner/TuneWorker.cpp
 
         src/ui/stats/dialog_traffic_stats.cpp
         include/ui/stats/dialog_traffic_stats.h
@@ -573,9 +607,14 @@ set(PROJECT_SOURCES
         include/ui/setting/RawRouteItem.h
         src/ui/setting/RouteDnsEditor.cpp
         include/ui/setting/RouteDnsEditor.h
+        src/ui/setting/ProcessPicker.cpp
+        include/ui/setting/ProcessPicker.h
+        src/ui/setting/dialog_rule_tester.cpp
+        include/ui/setting/dialog_rule_tester.h
 
         res/Rawline.qrc
         res/Seasonal.qrc
+        res/NewStyle.qrc
         res/MikanStyle.qrc
         ${QV2RAY_RC}
         res/darkstyle.qrc
@@ -583,6 +622,12 @@ set(PROJECT_SOURCES
         src/ui/profile/edit_ssh.cpp
         include/ui/profile/edit_ssh.h
         include/ui/profile/edit_ssh.ui
+        src/ui/profile/edit_dnstt.cpp
+        include/ui/profile/edit_dnstt.h
+        include/ui/profile/edit_dnstt.ui
+        src/ui/profile/edit_masterdns.cpp
+        include/ui/profile/edit_masterdns.h
+        include/ui/profile/edit_masterdns.ui
         include/stats/connections/connectionLister.hpp
         src/stats/connectionLister/connectionLister.cpp
         include/sys/windows/eventHandler.h
@@ -603,6 +648,10 @@ set(PROJECT_SOURCES
         src/configs/common/transport.cpp
         src/configs/common/Outbound.cpp
         src/configs/common/OutboundFactory.cpp
+        include/configs/common/ResolverSource.h
+        src/configs/common/ResolverSource.cpp
+        include/configs/common/DnsTunnel.h
+        src/configs/common/DnsTunnel.cpp
         include/configs/outbounds/socks.h
         include/configs/outbounds/http.h
         include/configs/outbounds/shadowsocks.h
@@ -647,6 +696,10 @@ set(PROJECT_SOURCES
         src/configs/outbounds/openvpn.cpp
         include/configs/outbounds/openconnect.h
         src/configs/outbounds/openconnect.cpp
+        include/configs/outbounds/dnstt.h
+        src/configs/outbounds/dnstt.cpp
+        include/configs/outbounds/masterdns.h
+        src/configs/outbounds/masterdns.cpp
         src/configs/outbounds/custom.cpp
         include/configs/generate.h
         src/configs/generate.cpp
@@ -729,6 +782,10 @@ set(PROJECT_SOURCES
         src/global/Common.cpp
         include/ui/app/GuiStartup.h
         src/ui/app/GuiStartup.cpp
+        include/ui/app/dialog_about.h
+        src/ui/app/dialog_about.cpp
+        include/ui/app/dialog_update.h
+        src/ui/app/dialog_update.cpp
 )
 
 if (NOT APPLE AND Qt6_VERSION VERSION_GREATER_EQUAL 6.9.0)
@@ -809,10 +866,16 @@ set(ENGINE_SOURCES
         src/engine/services/AssetUpdates.cpp
         include/engine/services/StatsService.h
         src/engine/services/StatsService.cpp
+        include/engine/services/RouteService.h
+        src/engine/services/RouteService.cpp
+        include/engine/services/WarpService.h
+        src/engine/services/WarpService.cpp
         include/engine/tests/TestObserver.h
         include/engine/tests/TestRunner.h
         include/engine/tests/TestSessionGate.h
         src/engine/tests/TestRunner.cpp
+        include/engine/tests/ServiceChecks.h
+        src/engine/tests/ServiceChecks.cpp
         include/engine/autoselector/AutoSelectorController.h
         src/engine/autoselector/AutoSelectorController.cpp
         include/engine/connection/ConnectionManager.h
@@ -904,6 +967,7 @@ endif ()
 set_property(SOURCE "3rdparty/SQLiteCpp/src/sqlite3.c" PROPERTY SKIP_UNITY_BUILD_INCLUSION ON)
 set_property(SOURCE "3rdparty/monocypher/monocypher.c" PROPERTY SKIP_UNITY_BUILD_INCLUSION ON)
 # Its file-local helpers (T, label, softCurve...) must not meet another file's in a unity batch.
+set_property(SOURCE "src/ui/widget/NewHome.cpp" PROPERTY SKIP_UNITY_BUILD_INCLUSION ON)
 set_property(SOURCE "src/ui/widget/MikanHome.cpp" PROPERTY SKIP_UNITY_BUILD_INCLUSION ON)
 
 # Verified to link. OMIT_VIRTUALTABLE/VIEW/ANALYZE/CTE/WINDOWFUNC/DECLTYPE all break this build.

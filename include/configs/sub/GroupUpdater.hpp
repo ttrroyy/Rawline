@@ -94,12 +94,18 @@ namespace Subscription {
 
         void ImportText(const QString &text, int gid = -1, const Finish &finish = nullptr);
 
+        // Asks for the password of an encrypted bundle in imported text; set by the interface, empty without one.
+        std::function<QString()> bundlePassword;
+
         void ImportBatch(const QStringList &payloads, const Finish &finish = nullptr);
 
         // Copies land in the current group and keep their source's endpoint, which no link carries.
         void CloneProfiles(const QList<int> &ids, const Finish &finish = nullptr);
 
         void SetUrlTester(UrlTester tester);
+
+        // Runs the IP test that the country filter judges by; same contract as UrlTester.
+        void SetCountryTester(UrlTester tester);
 
         // A refresh of gid that reports its outcome; while gid is already queued or running, done shares that job's outcome.
         void RefreshWithOutcome(int gid, Surface surface, const OutcomeFinish &done);
@@ -139,8 +145,12 @@ namespace Subscription {
                           const Configs::SubUserInfo &subInfo, Surface surface, UpdateOutcome &result,
                           const QList<ProviderRouting::Command> &routing, const QList<QJsonObject> &previousHashes);
         void afterUrlTest(int gid);
+        void afterCountryTest(int gid, bool interactive);
+        // The post-update URL test, when the group asks for one.
+        void startUrlTest(int gid, const QList<int> &profileIDs, bool interactive);
         // emptyReason replaces the generic "nothing found" when no profile is imported; quiet never shows a report box.
         UpdateOutcome importDocuments(int gid, QList<QByteArray> documents, const QString &emptyReason = {}, bool quiet = false);
+        // *routing gets the "routing" header (a Happ routing link), empty when absent.
         bool fetch(const QString &url, const QString &name, const RequestIdentity &identity, QByteArray &body,
                    Configs::SubUserInfo &subInfo, QString *error = nullptr, QString *routing = nullptr);
         [[nodiscard]] qint64 autoUpdateDue(const Configs::Group &group, qint64 interval) const;
@@ -156,6 +166,7 @@ namespace Subscription {
         int pendingBatch = 0;
         bool running = false;
         UrlTester urlTester;
+        UrlTester countryTester;
     };
 
     struct AutoUpdatePlan {

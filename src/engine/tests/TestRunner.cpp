@@ -2,6 +2,7 @@
 
 #include "include/api/RPC.h"
 #include "include/configs/generate.h"
+#include "include/configs/common/DnsTunnel.h"
 #include "include/configs/outbounds/qwdtt.h"
 #include "include/database/GroupsRepo.h"
 #include "include/database/ProfilesRepo.h"
@@ -15,6 +16,8 @@
 #include "include/stats/traffic/TrafficStatsManager.hpp"
 
 #include <QCoreApplication>
+#include <QDateTime>
+#include <QMutex>
 #include <QSemaphore>
 #include <QSet>
 #include <QJsonDocument>
@@ -69,15 +72,53 @@ namespace {
     constexpr int kTestRunnerRpcSlackMs = 30000;
 
     // Test/IPTest answer only once the whole batch is done, so the deadline covers its worst case.
-    int testRunnerBatchRpcTimeoutMs(qsizetype tagCount, int requestsPerTag) {
+    // startupAllowanceMs: what a DNS tunnel among the tags needs on top to come up.
+    int testRunnerBatchRpcTimeoutMs(qsizetype tagCount, int requestsPerTag, int startupAllowanceMs = 0) {
         const auto& settings = Configs::dataManager->settingsRepo;
         int concurrency = settings->test_concurrent;
         if (concurrency <= 0 || concurrency >= 500) concurrency = kTestRunnerCoreMaxConcurrency;
         const qint64 timeoutMs = settings->url_test_timeout_ms > 0 ? settings->url_test_timeout_ms : kTestRunnerCoreDefaultTimeoutMs;
         const qint64 rounds = (qMax<qsizetype>(tagCount, 1) + concurrency - 1) / concurrency;
-        const qint64 total = rounds * (kTestRunnerTunnelHandshakeMs + requestsPerTag * timeoutMs + kTestRunnerTunnelStartupMs) + kTestRunnerRpcSlackMs;
+        const qint64 total = rounds * (kTestRunnerTunnelHandshakeMs + requestsPerTag * timeoutMs + kTestRunnerTunnelStartupMs + startupAllowanceMs) +
+                             kTestRunnerRpcSlackMs;
         return static_cast<int>(qMin<qint64>(total, std::numeric_limits<int>::max()));
     }
+
+    int testRunnerStartupAllowanceMs(const QMap<QString, int>& tag2entID, int entID) {
+        int allowance = 0;
+        const auto add = [&allowance](int id) {
+            if (id >= 0) allowance = qMax(allowance, Configs::DnsTunnelStartupAllowanceMs(Configs::dataManager->profilesRepo->GetProfile(id)));
+        };
+        add(entID);
+        for (const int id : tag2entID) add(id);
+        return allowance;
+    }
+
+    constexpr int kTestRunnerServiceBatchSize = 25;
+    constexpr int kTestRunnerServiceConcurrency = 4;
+    constexpr int kTestRunnerServiceRequestTimeoutMs = 10000;
+    constexpr qint64 kTestRunnerServiceRoundMs = 200000;
+    constexpr qint64 kTestRunnerServiceSlackMs = 60000;
+
+    int testRunnerServiceRpcTimeoutMs(qsizetype tagCount) {
+        const qint64 rounds = (qMax<qsizetype>(tagCount, 1) + kTestRunnerServiceConcurrency - 1) / kTestRunnerServiceConcurrency;
+        return static_cast<int>(qMin<qint64>(rounds * kTestRunnerServiceRoundMs + kTestRunnerServiceSlackMs, std::numeric_limits<int>::max()));
+    }
+
+    // A poll and the final reply can both carry a finished profile; whichever comes first applies it.
+    class TestRunnerClaimedTags {
+    public:
+        bool claim(const QString& tag) {
+            QMutexLocker locker(&mu_);
+            if (tags_.contains(tag)) return false;
+            tags_.insert(tag);
+            return true;
+        }
+
+    private:
+        QMutex mu_;
+        QSet<QString> tags_;
+    };
 
     int testRunnerResolveEntID(const QMap<QString, int>& tag2entID, const std::string& tag, int fallback) {
         if (tag2entID.isEmpty()) return fallback;
@@ -89,7 +130,7 @@ namespace {
     void testRunnerFillCommonTestReq(Req& req, const Target& target) {
         for (const auto& tag : target.outboundTags) req.outbound_tags.push_back(tag.toStdString());
         req.config = target.coreConfig.toStdString();
-        req.qwdtt_config = target.qwdttConfig.toStdString();
+        if constexpr (requires { req.qwdtt_config; }) req.qwdtt_config = target.qwdttConfig.toStdString();
         req.use_default_outbound = target.useDefaultOutbound;
         req.xray_config = target.xrayConfig.toStdString();
         req.need_xray = !target.xrayConfig.isEmpty();
@@ -218,7 +259,7 @@ void TestRunner::applyIpResult(const std::shared_ptr<Configs::Profile>& ent, con
 }
 
 // The core buffers each finished result of a shared test box; show it as soon as it arrives.
-void TestRunner::pollUrlStream() {
+void TestRunner::pollUrlStream(const ResultHook& onResult) {
     bool ok = false;
     const auto resp = API::defaultClient->QueryURLTest(&ok);
     if (!ok) return;
@@ -236,6 +277,7 @@ void TestRunner::pollUrlStream() {
         auto ent = Configs::dataManager->profilesRepo->GetProfile(entid);
         if (ent == nullptr) continue;
         applyUrlResult(ent, res);
+        if (onResult) onResult(ent);
         observer_->testProgressed();
         updated << entid;
     }
@@ -277,8 +319,8 @@ void TestRunner::runUrlProbe(const Target& target) {
     }
     {
         std::unique_ptr<TestRunnerResultPoller> poller;
-        if (streaming) poller = std::make_unique<TestRunnerResultPoller>([this] { pollUrlStream(); }, kTestRunnerLatencyPollIntervalMs);
-        result = API::defaultClient->Test(&rpcOK, req, &coreError, testRunnerBatchRpcTimeoutMs(target.outboundTags.size(), 2) + (target.qwdttConfig.isEmpty() ? 0 : kTestRunnerNativeRpcSlackMs));
+        if (streaming) poller = std::make_unique<TestRunnerResultPoller>([this, onResult = target.onResult] { pollUrlStream(onResult); }, kTestRunnerLatencyPollIntervalMs);
+        result = API::defaultClient->Test(&rpcOK, req, &coreError, testRunnerBatchRpcTimeoutMs(target.outboundTags.size(), 2, testRunnerStartupAllowanceMs(target.tag2entID, target.entID)) + (target.qwdttConfig.isEmpty() ? 0 : kTestRunnerNativeRpcSlackMs));
     }
     // What the stream already showed; a late poll tick finds the tags gone and drops its copy.
     QSet<QString> shown;
@@ -300,6 +342,7 @@ void TestRunner::runUrlProbe(const Target& target) {
                 failed.outbound_tag = it.key().toStdString(); failed.latency_ms = 0;
                 failed.error = error.toStdString();
                 applyUrlResult(ent, failed);
+                if (target.onResult) target.onResult(ent);
             }
         }
         return;
@@ -326,11 +369,13 @@ void TestRunner::runUrlProbe(const Target& target) {
             // Already counted; only a VPN endpoint's connect-only verdict can still change it.
             if (!res.error.value().empty() && testRunnerIsVpnProfile(ent)) {
                 applyUrlResult(ent, res, &vpnConnected);
+                if (target.onResult) target.onResult(ent);
                 runOnUiThread([this, entid] { observer_->testedProfilesChanged({entid}); });
             }
             continue;
         }
         applyUrlResult(ent, res, &vpnConnected);
+        if (target.onResult) target.onResult(ent);
         {
             observer_->testProgressed();
             observer_->testViewChanged(true);
@@ -352,12 +397,16 @@ void TestRunner::runIpProbe(const Target& target) {
     req.max_concurrency = Configs::dataManager->settingsRepo->test_concurrent;
     req.test_timeout_ms = Configs::dataManager->settingsRepo->url_test_timeout_ms;
     req.stop_epoch = epoch;
+    req.provider = Configs::dataManager->settingsRepo->exit_lookup_provider.toStdString();
 
     bool rpcOK = false;
     QString coreError;
     libcore::IPTestResp result;
     {
-        result = API::defaultClient->IPTest(&rpcOK, req, &coreError, testRunnerBatchRpcTimeoutMs(target.outboundTags.size(), 1) + (target.qwdttConfig.isEmpty() ? 0 : kTestRunnerNativeRpcSlackMs));
+        result = API::defaultClient->IPTest(&rpcOK, req, &coreError,
+                                            testRunnerBatchRpcTimeoutMs(target.outboundTags.size(), 1,
+                                                                        testRunnerStartupAllowanceMs(target.tag2entID, target.entID)) +
+                                            (target.qwdttConfig.isEmpty() ? 0 : kTestRunnerNativeRpcSlackMs));
     }
 
     if (!rpcOK || result.results.empty()) {
@@ -385,8 +434,9 @@ void TestRunner::runIpProbe(const Target& target) {
     }
 }
 
-bool TestRunner::runUrlTests(const QList<int>& profileIDs, const std::function<void()>& onFinished, bool interactive) {
-    return runLatencyGroup(LatencyKind::Url, profileIDs, onFinished, false, interactive);
+bool TestRunner::runUrlTests(const QList<int>& profileIDs, const std::function<void()>& onFinished, bool interactive,
+                             const ResultHook& onResult) {
+    return runLatencyGroup(LatencyKind::Url, profileIDs, onFinished, false, interactive, onResult);
 }
 
 void TestRunner::queueUrlTests(const QList<int>& profileIDs, const std::function<void()>& onFinished, bool interactive) {
@@ -397,8 +447,270 @@ bool TestRunner::runIpTests(const QList<int>& profileIDs, const std::function<vo
     return runLatencyGroup(LatencyKind::Ip, profileIDs, onFinished, false, interactive);
 }
 
+void TestRunner::queueIpTests(const QList<int>& profileIDs, const std::function<void()>& onFinished, bool interactive) {
+    runOnNewThread([=, this] { runLatencyGroup(LatencyKind::Ip, profileIDs, onFinished, true, interactive); });
+}
+
+void TestRunner::applyServiceResult(const std::shared_ptr<Configs::Profile>& ent, const libcore::ServiceTestResult& res,
+                                    const QList<ServiceChecks::Category>& categories) {
+    const auto error = QString::fromStdString(res.error.value());
+    // An aborted check says nothing about the profile, so its previous one stays.
+    if (testRunnerIsTestAborted(error)) return;
+    if (!error.isEmpty()) {
+        MW_show_log(MainWindowTr::tr("[%1] service check error: %2").arg(ent->outbound->DisplayTypeAndName(), error));
+    }
+    ent->service_checks = ServiceChecks::ResultJson(res, categories, QDateTime::currentSecsSinceEpoch());
+    Configs::dataManager->profilesRepo->Save(ent);
+}
+
+void TestRunner::runServiceProbe(const Target& target, const std::shared_ptr<const ServiceChecks::Definitions>& definitions) {
+    if (gate_.stopRequested.load()) {
+        MW_show_log(MainWindowTr::tr("Profile test aborted"));
+        return;
+    }
+
+    libcore::ServiceTestRequest req;
+    testRunnerFillCommonTestReq(req, target);
+    req.max_concurrency = kTestRunnerServiceConcurrency;
+    req.test_timeout_ms = kTestRunnerServiceRequestTimeoutMs;
+    req.checks = definitions->text.toStdString();
+    req.test_current = target.testCurrent;
+
+    const auto claimed = std::make_shared<TestRunnerClaimedTags>();
+    bool rpcOK = false;
+    QString coreError;
+    libcore::ServiceTestResponse result;
+    {
+        TestRunnerResultPoller poller([this, gen = sessionGen_.load(), tag2entID = target.tag2entID, definitions, claimed] {
+            if (staleGen(gen)) return;
+            bool ok = false;
+            const auto resp = API::defaultClient->QueryServiceTest(&ok);
+            if (staleGen(gen)) return;
+            if (!ok || resp.results.empty()) return;
+
+            QList<int> updated;
+            for (const auto& res : resp.results) {
+                const int entid = testRunnerResolveEntID(tag2entID, res.outbound_tag.value(), -1);
+                if (entid == -1) continue;
+                auto ent = Configs::dataManager->profilesRepo->GetProfile(entid);
+                if (ent == nullptr || !claimed->claim(QString::fromStdString(res.outbound_tag.value()))) continue;
+                observer_->testProgressed();
+                observer_->testViewChanged(false);
+                applyServiceResult(ent, res, definitions->categories);
+                updated << entid;
+            }
+            if (updated.isEmpty()) return;
+            observer_->testViewChanged(true);
+            runOnUiThread([=, this] { observer_->testedProfilesChanged(updated); });
+        }, kTestRunnerLatencyPollIntervalMs);
+
+        result = API::defaultClient->ServiceTest(&rpcOK, req, &coreError, testRunnerServiceRpcTimeoutMs(target.outboundTags.size()));
+    }
+
+    if (!rpcOK) {
+        if (testRunnerIsTestAborted(coreError)) return;
+        if (!AssetUpdates::HandleXrayGeoError(policy_, coreError, contextName(target.entID), interactive_.load())) {
+            MW_show_log(MainWindowTr::tr("Service check failed: %1")
+                            .arg(coreError.isEmpty() ? MainWindowTr::tr("The core did not answer the test") : coreError));
+        }
+        return;
+    }
+
+    // The live instance changed under the check, so its answers may describe another exit.
+    if (target.testCurrent && runningProfileId() != target.entID) return;
+    for (const auto& res : result.results) {
+        const int entid = testRunnerResolveEntID(target.tag2entID, res.outbound_tag.value(), target.entID);
+        if (entid == -1) {
+            MW_show_log(MainWindowTr::tr("Something is very wrong, the subject ent cannot be found!"));
+            continue;
+        }
+        auto ent = Configs::dataManager->profilesRepo->GetProfile(entid);
+        if (ent == nullptr) {
+            MW_show_log(MainWindowTr::tr("Profile manager data is corrupted, try again."));
+            continue;
+        }
+        if (!claimed->claim(QString::fromStdString(res.outbound_tag.value()))) continue;
+        observer_->testProgressed();
+        applyServiceResult(ent, res, definitions->categories);
+    }
+}
+
+bool TestRunner::runServiceChecks(const QList<int>& requestedIDs, const std::function<void()>& onFinished, bool interactive) {
+    return runServiceSession(requestedIDs, false, onFinished, interactive);
+}
+
+bool TestRunner::runCurrentServiceCheck(const std::function<void()>& onFinished, bool interactive) {
+    const auto running = runningSnapshot_();
+    if (running == nullptr) {
+        if (onFinished) onFinished();
+        return false;
+    }
+    return runServiceSession({running->id}, true, onFinished, interactive);
+}
+
+// Holds the exclusive session as a speed test does: its requests must not share the core with latency probes.
+bool TestRunner::runServiceSession(const QList<int>& requestedIDs, bool testCurrent, const std::function<void()>& onFinished,
+                                   bool interactive) {
+    const auto finish = [onFinished] { if (onFinished) onFinished(); };
+    const auto profileIDs = testRunnerWithoutAutoSelectors(requestedIDs);
+    if (profileIDs.isEmpty()) {
+        finish();
+        return false;
+    }
+    // The menus ask first; this also holds for API callers.
+    if (profileIDs.size() > kMaxServiceCheckProfiles) {
+        MW_show_log(MainWindowTr::tr("A service check can test up to 100 profiles at a time. Select fewer profiles."));
+        finish();
+        return false;
+    }
+    if (!gate_.beginSpeed()) {
+        const auto text = MainWindowTr::tr("The last test did not finish completely, please wait. If it persists, please restart the program.");
+        if (interactive && QThread::currentThread() == QCoreApplication::instance()->thread()) policy_->testSessionBusy(text);
+        else MW_show_log(text);
+        finish();
+        return false;
+    }
+    sessionGen_.fetch_add(1);
+    interactive_.store(interactive);
+
+    runOnNewThread([this, profileIDs, testCurrent, finish] {
+        observer_->testPanelSeeded(TestKind::Service, profileIDs.size());
+        observer_->testViewChanged(true);
+
+        const auto definitions = std::make_shared<const ServiceChecks::Definitions>(ServiceChecks::Prepare());
+        if (!definitions->error.isEmpty()) MW_show_log(MainWindowTr::tr("Service check failed: %1").arg(definitions->error));
+
+        if (testCurrent && definitions->error.isEmpty()) {
+            Target target;
+            target.testCurrent = true;
+            target.entID = profileIDs.first();
+            runServiceProbe(target, definitions);
+            runOnUiThread([=, this] { observer_->testedProfilesChanged(profileIDs); });
+        }
+        for (int i = 0; !testCurrent && definitions->error.isEmpty() && i < profileIDs.length(); i += kTestRunnerServiceBatchSize) {
+            if (gate_.stopRequested.load()) break;
+            const auto ids = profileIDs.mid(i, kTestRunnerServiceBatchSize);
+            sessionGen_.fetch_add(1);
+            const auto buildObject = Configs::BuildTestConfig(Configs::dataManager->profilesRepo->GetProfileBatch(ids));
+            if (!buildObject->error.isEmpty()) {
+                MW_show_log(MainWindowTr::tr("Failed to build test config for batch: ") + buildObject->error);
+                continue;
+            }
+            const int testCount = buildObject->fullConfigs.size() + (buildObject->outboundTags.empty() ? 0 : 1);
+            if (testCount == 0) continue;
+
+            QSemaphore batchDone;
+            const auto probe = [this, &definitions, &batchDone](const Target& target) {
+                pool_.start([this, target, definitions, &batchDone] {
+                    const QSemaphoreReleaser releaser(batchDone);
+                    runServiceProbe(target, definitions);
+                });
+            };
+            for (const auto& entID : buildObject->fullConfigs.keys()) {
+                Target target;
+                target.coreConfig = buildObject->fullConfigs[entID];
+                target.useDefaultOutbound = true;
+                target.entID = entID;
+                probe(target);
+            }
+            if (!buildObject->outboundTags.empty()) {
+                Target target;
+                target.coreConfig = QJsonObject2QString(buildObject->coreConfig, false);
+                target.xrayConfig = buildObject->isXrayNeeded ? QJsonObject2QString(buildObject->xrayConfig, false) : "";
+                target.xrayFullConfigs = buildObject->xrayFullConfigs;
+                target.outboundTags = buildObject->outboundTags;
+                target.tag2entID = buildObject->tag2entID;
+                target.xrayDnsStrategy = buildObject->xrayDnsStrategy;
+                probe(target);
+            }
+            batchDone.acquire(testCount);
+            runOnUiThread([=, this] { observer_->testedProfilesChanged(ids); });
+        }
+
+        observer_->testPanelsCleared();
+        observer_->testViewChanged(true);
+        gate_.finishSpeed();
+        finish();
+        if (definitions->error.isEmpty()) MW_show_log(MainWindowTr::tr("Service check finished!"));
+    });
+    return true;
+}
+
+bool TestRunner::runChainStepTest(const QList<int>& hops, int gid, const std::function<void(const ChainStepReport&)>& onDone) {
+    if (!gate_.beginSpeed()) return false;
+    sessionGen_.fetch_add(1);
+    interactive_.store(true);
+
+    runOnNewThread([this, hops, gid, onDone] {
+        ChainStepReport report;
+        const auto build = Configs::BuildChainStepTestConfig(hops, gid);
+        report.invalidHops = build.invalidHops;
+        report.hasLanding = build.hasLanding;
+        if (!build.error.isEmpty()) {
+            report.error = build.error;
+        } else if (build.build != nullptr && !build.build->outboundTags.isEmpty()) {
+            Target target;
+            target.coreConfig = QJsonObject2QString(build.build->coreConfig, false);
+            target.xrayConfig = build.build->isXrayNeeded ? QJsonObject2QString(build.build->xrayConfig, false) : "";
+            target.xrayFullConfigs = build.build->xrayFullConfigs;
+            target.outboundTags = build.build->outboundTags;
+            target.xrayDnsStrategy = build.build->xrayDnsStrategy;
+
+            libcore::TestReq req;
+            testRunnerFillCommonTestReq(req, target);
+            req.url = Configs::dataManager->settingsRepo->test_latency_url.toStdString();
+            req.max_concurrency = Configs::dataManager->settingsRepo->test_concurrent;
+            req.test_timeout_ms = Configs::dataManager->settingsRepo->url_test_timeout_ms;
+            req.stop_epoch = stopEpoch_.load();
+            for (const auto& tag : build.vpnEndpointTags) req.vpn_endpoint_tags.push_back(tag.toStdString());
+
+            int allowance = 0;
+            for (const int id : hops) {
+                allowance = qMax(allowance, Configs::DnsTunnelStartupAllowanceMs(Configs::dataManager->profilesRepo->GetProfile(id)));
+            }
+            bool rpcOK = false;
+            QString coreError;
+            const auto result = API::defaultClient->Test(&rpcOK, req, &coreError,
+                                                         testRunnerBatchRpcTimeoutMs(target.outboundTags.size(), 2, allowance));
+            // Test also queues every result for QueryURLTest; drain them so a later run's poller never sees these tags.
+            bool drained = false;
+            API::defaultClient->QueryURLTest(&drained);
+
+            if (!rpcOK) {
+                report.error = coreError.isEmpty() ? MainWindowTr::tr("The core did not answer the test") : coreError;
+            } else {
+                QHash<QString, bool> vpnConnected;
+                for (const auto& st : result.vpn_status) vpnConnected.insert(QString::fromStdString(st.tag.value()), st.connected.value());
+                for (const auto& res : result.results) {
+                    const auto tag = QString::fromStdString(res.outbound_tag.value());
+                    if (!build.tag2probe.contains(tag)) continue;
+                    const auto probe = build.tag2probe.value(tag);
+                    ChainStepResult step{probe.hop, probe.alone};
+                    const auto error = QString::fromStdString(res.error.value());
+                    if (error.isEmpty()) {
+                        step.latency = res.latency_ms.value();
+                    } else if (testRunnerIsTestAborted(error)) {
+                        report.aborted = true;
+                        continue;
+                    } else if (vpnConnected.value(tag, false)) {
+                        step.latency = Configs::kLatencyConnectOnly;
+                    } else {
+                        step.latency = -1;
+                        step.error = error;
+                    }
+                    report.results << step;
+                }
+            }
+        }
+        gate_.finishSpeed();
+        if (onDone) onDone(report);
+    });
+    return true;
+}
+
 bool TestRunner::runLatencyGroup(LatencyKind kind, const QList<int>& requestedIDs,
-                                 const std::function<void()>& onFinished, bool waitForSession, bool interactive) {
+                                 const std::function<void()>& onFinished, bool waitForSession, bool interactive,
+                                 const ResultHook& onResult) {
     const bool isUrl = kind == LatencyKind::Url;
     const auto panelKind = isUrl ? TestKind::Latency : TestKind::Ip;
     // Must fire on every exit path — a caller may be blocked on it.
@@ -447,14 +759,14 @@ bool TestRunner::runLatencyGroup(LatencyKind kind, const QList<int>& requestedID
         observer_->testStateChanged(profileIDs, 1);
     });
 
-    runOnNewThread([this, profileIDs, panelKind, isUrl, finish]() {
+    runOnNewThread([this, profileIDs, panelKind, isUrl, finish, onResult]() {
         observer_->testPanelSeeded(panelKind, profileIDs.size());
         observer_->testViewChanged(true);
 
         // Native transports finish on their own: a slow handshake must not hold the next batch back.
         QSemaphore nativeDone;
         int nativeCount = 0;
-        auto runBatch = [this, isUrl, &nativeDone, &nativeCount](const QList<std::shared_ptr<Configs::Profile>>& profileSlice, const QList<int>& ids) {
+        auto runBatch = [this, isUrl, &nativeDone, &nativeCount, &onResult](const QList<std::shared_ptr<Configs::Profile>>& profileSlice, const QList<int>& ids) {
             auto buildObject = Configs::BuildTestConfig(profileSlice);
             if (!buildObject->error.isEmpty()) {
                 MW_show_log(MainWindowTr::tr("Failed to build test config for batch: ") + buildObject->error);
@@ -481,6 +793,7 @@ bool TestRunner::runLatencyGroup(LatencyKind kind, const QList<int>& requestedID
                 target.coreConfig = buildObject->fullConfigs[entID];
                 target.useDefaultOutbound = true;
                 target.entID = entID;
+                target.onResult = onResult;
                 target.qwdttConfig = buildObject->qwdttConfigs.value(entID);
                 if (isUrl && !target.qwdttConfig.isEmpty()) {
                     auto config = QJsonDocument::fromJson(target.qwdttConfig.toUtf8()).object();
@@ -508,6 +821,7 @@ bool TestRunner::runLatencyGroup(LatencyKind kind, const QList<int>& requestedID
                 target.outboundTags = buildObject->outboundTags;
                 target.tag2entID = buildObject->tag2entID;
                 target.xrayDnsStrategy = buildObject->xrayDnsStrategy;
+                target.onResult = onResult;
                 probe(target);
             }
             for (const auto &target : individualTargets) probe(target);
@@ -826,7 +1140,8 @@ void TestRunner::runSpeedProbe(const Target& target)
             MW_show_log(MainWindowTr::tr("[%1] speed test error: %2").arg(ent->outbound->DisplayTypeAndName(), error));
         }
         Configs::dataManager->profilesRepo->Save(ent);
-        runOnUiThread([this, entid] { observer_->testStateChanged({entid}, 0); });
+        // The row still holds what the live updates left (the first profile's often without its country): it rereads the saved result.
+        runOnUiThread([this, entid] { observer_->testedProfilesChanged({entid}); observer_->testStateChanged({entid}, 0); });
     }
 }
 } // namespace Engine

@@ -1,5 +1,6 @@
 #include "include/ui/widget/MikanHome.hpp"
 #include "include/ui/widget/MikanIcons.h"
+#include "include/ui/widget/NewHome.hpp"
 
 #include "include/ui/mainwindow.h"
 #include "include/ui/mainWindow/MainWindowInternal.h"
@@ -380,8 +381,7 @@ void Mikan::roundCorners(QWidget *window, bool compact) {
 }
 
 bool Mikan::isTheme(const QString &theme) {
-    return theme == QLatin1String(DarkTheme) || theme == QLatin1String(LightTheme)
-        || theme == QLatin1String(LegacyDarkTheme) || theme == QLatin1String(LegacyLightTheme);
+    return theme == QLatin1String(DarkTheme) || theme == QLatin1String(LightTheme);
 }
 
 void Mikan::setTheme(const QString &theme) {
@@ -406,7 +406,7 @@ void Mikan::setTheme(const QString &theme) {
 }
 
 bool Mikan::active() { return isTheme(g_theme); }
-bool Mikan::light() { return g_theme == QLatin1String(LightTheme) || g_theme == QLatin1String(LegacyLightTheme); }
+bool Mikan::light() { return g_theme == QLatin1String(LightTheme); }
 
 QColor Mikan::background() { return light() ? QColor(255, 246, 248) : QColor(0, 0, 0); }
 QColor Mikan::text() { return light() ? QColor(30, 27, 51) : QColor(245, 245, 247); }
@@ -3267,8 +3267,9 @@ static void repairNativeCaption(QWidget *window) {
 }
 #endif
 
-void MainWindow::applyInterfaceStyle(bool animated) {
+void MainWindow::applyMikanInterfaceStyle(bool animated) {
     const bool wantMikan = Mikan::active();
+    const bool wantNew = !wantMikan && NewStyle::active();
     QLabel *cover = nullptr;
     // A change of look: the old picture stays on top until the new one is ready, then fades.
     if (animated && isVisible() && !isMinimized()) {
@@ -3289,14 +3290,25 @@ void MainWindow::applyInterfaceStyle(bool animated) {
             mikanHome = new MikanHome(this);
             rootStack->addWidget(mikanHome);
         }
+        if (newHome) newHome->detach();
         mikanHome->attach();
         rootStack->setCurrentWidget(mikanHome);
         mikanHome->update();
+    } else if (wantNew) {
+        if (!newHome) {
+            newHome = new NewHome(this);
+            rootStack->addWidget(newHome);
+        }
+        if (mikanHome) mikanHome->detach();
+        newHome->attach();
+        rootStack->setCurrentWidget(newHome);
+        newHome->update();
     } else {
+        if (newHome) newHome->detach();
         if (mikanHome) mikanHome->detach();
         rootStack->setCurrentIndex(0);
     }
-    const bool frameless = wantMikan;
+    const bool frameless = wantMikan || wantNew;
     const bool frameDiffers = bool(windowFlags() & Qt::FramelessWindowHint) != frameless;
     // Changing the frame re-creates the window and would hide an open dialog with it.
     // Doing it inside the dialog's finished() is still too early: the owner window is torn down
@@ -3312,7 +3324,7 @@ void MainWindow::applyInterfaceStyle(bool animated) {
                     connect(dialog, &QDialog::finished, this, [this] {
                         QTimer::singleShot(0, this, [this] {
                             m_frameChangeDeferred = false;
-                            applyInterfaceStyle(false);
+                            applyMikanInterfaceStyle(false);
                         });
                     }, Qt::SingleShotConnection);
                 }

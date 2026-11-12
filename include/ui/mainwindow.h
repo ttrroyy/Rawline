@@ -69,6 +69,7 @@ class GlobalHotkeys;
 class DialogVpnAuth;
 class DialogScanner;
 class DialogIpLists;
+class DialogRuleTester;
 class CommandPalette;
 
 namespace Qv2ray::ui { class SyntaxHighlighter; }
@@ -87,11 +88,14 @@ enum class RefreshAnchor {
 
 using ExitReason = Engine::ExitReason;
 
+class NewHome;
 class MikanHome;
 class QStackedWidget;
 
 class MainWindow : public QMainWindow, public Engine::EnginePolicy, public Engine::TestObserver {
     Q_OBJECT
+    // The new interface lays out the same actions, menus and models as this window.
+    friend class NewHome;
     // The Mikan interface lays out the same actions, menus and models as this window.
     friend class MikanHome;
 
@@ -191,6 +195,8 @@ private slots:
 
     void on_menu_scanner_triggered();
 
+    void on_menu_find_settings_triggered();
+
     void on_menu_integration_settings_triggered();
 
     void on_menu_add_from_input_triggered();
@@ -245,10 +251,13 @@ private:
     Ui::MainWindow *ui;
     SeasonalDecoration *seasonalDecoration = nullptr;
     QStackedWidget *rootStack = nullptr;
+    NewHome *newHome = nullptr;
     MikanHome *mikanHome = nullptr;
     // Shows the classic or the new interface, as the theme asks.
     void applyInterfaceStyle(bool animated);
-    // A dialog is open, so the frame change waits until it has closed.
+    // Mikan's own screen and caption. Rawline OLED stays in NewHome.cpp.
+    void applyMikanInterfaceStyle(bool animated);
+    // A dialog is open, so the Mikan frame change waits until it has closed.
     bool m_frameChangeDeferred = false;
     QElapsedTimer sinceWindowDeactivated;
     ProfilesTableModel *profilesTableModel = nullptr;
@@ -310,7 +319,7 @@ private:
     QString addressFilterString;
     QString nameFilterString;
     QString typeFilterString;
-    QString countryFilterString;
+    QString testFilterString;
 
     QTimer *m_filterRefreshDebounce = nullptr;
 
@@ -342,6 +351,7 @@ private:
     QRegularExpression m_logSearch;
     QTimer *m_logSearchDebounce = nullptr;
     QToolButton *logFilterButton = nullptr;
+    QToolButton *logSendButton = nullptr;
     QToolButton *logJumpLatestButton = nullptr;
 
     struct LogFilter {
@@ -372,6 +382,8 @@ private:
     void applyLogSearch();
 
     void setLogFilterVisible(bool visible);
+    // The mobile app's "send logs": a log export with the app and system, secrets hidden, ready to paste into a chat.
+    void sendLogs();
 
     void updateLogStatus();
 
@@ -508,9 +520,18 @@ private:
 
     void createCommandPalette();
 
+    void fillPaletteSettings();
+
     void showCommandPalette();
 
     void revealSetting(const SettingsIndex::Item &item);
+
+    void applyUiMode();
+
+    void setSimpleMode(bool simple);
+
+    // Takes or frees the one-settings-dialog slot (dialog_is_using) and lets an open command palette catch up.
+    void setDialogInUse(bool inUse);
 
     void url_test_current();
 
@@ -523,6 +544,7 @@ private:
     QPointer<DialogVpnAuth> m_vpnAuthDialog;
     QPointer<DialogScanner> m_scannerDialog;
     QPointer<DialogIpLists> m_ipListsDialog;
+    QPointer<DialogRuleTester> m_ruleTesterDialog;
     QHash<int, QString> m_scannerNames;
     bool m_scannerPanelShown = false;
 

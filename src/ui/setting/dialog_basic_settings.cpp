@@ -3,6 +3,7 @@
 #include "include/ui/widget/json/JsonEditorDialog.h"
 #include "include/ui/widget/json/SchemaStore.h"
 #include "include/ui/setting/ThemeManager.hpp"
+#include "include/ui/widget/NewHome.hpp"
 #include "include/ui/widget/MikanHome.hpp"
 #include "include/ui/setting/Icon.hpp"
 #include "include/ui/utils/GuiUtils.hpp"
@@ -13,6 +14,7 @@
 #include "include/database/entities/Group.h"
 #include "include/engine/services/AssetUpdates.h"
 #include "include/engine/services/BackupArchive.h"
+#include "include/ui/utils/UiMode.h"
 #include "include/ui/utils/ValidationForm.h"
 
 #include <QStyleFactory>
@@ -329,6 +331,7 @@ DialogBasicSettings::DialogBasicSettings(QWidget *parent)
     ui->skip_delete_confirm->setChecked(Configs::dataManager->settingsRepo->skip_delete_confirmation);
     D_LOAD_BOOL(show_config_security)
     ui->language->setCurrentIndex(Configs::dataManager->settingsRepo->language);
+    ui->ui_mode->setCurrentIndex(Configs::dataManager->settingsRepo->simple_mode ? 0 : 1);
     connect(ui->language, &QComboBox::currentIndexChanged, this, [=,this](int index) {
         CACHE.needRestart = true;
     });
@@ -364,9 +367,11 @@ DialogBasicSettings::DialogBasicSettings(QWidget *parent)
     ui->theme->addItem("QDarkStyle");
     // Custom stylesheet themes, not QStyleFactory keys.
     ui->theme->addItems({"FlatGray", "LightBlue", "SoftPink", "BlackSoft"});
-    // The new interface: the mobile app's look, in its two themes.
-    ui->theme->addItem(tr("Mikan-like dark"), QString::fromLatin1(Mikan::DarkTheme));
-    ui->theme->addItem(tr("Mikan-like light"), QString::fromLatin1(Mikan::LightTheme));
+    // The new interface: the mobile app's look, in its two themes, first in the list.
+    ui->theme->insertItem(0, tr("Rawline OLED"), QString::fromLatin1(NewStyle::OledTheme));
+    ui->theme->insertItem(1, tr("Rawline White"), QString::fromLatin1(NewStyle::WhiteTheme));
+    ui->theme->insertItem(2, tr("Mikan-like dark"), QString::fromLatin1(Mikan::DarkTheme));
+    ui->theme->insertItem(3, tr("Mikan-like light"), QString::fromLatin1(Mikan::LightTheme));
     ui->enable_custom_icon->setChecked(Configs::dataManager->settingsRepo->use_custom_icons);
     ui->follow_status_in_taskbar->setChecked(Configs::dataManager->settingsRepo->follow_status_in_taskbar);
     ui->follow_status_in_taskbar->setEnabled(ui->enable_custom_icon->isChecked());
@@ -404,16 +409,20 @@ DialogBasicSettings::DialogBasicSettings(QWidget *parent)
     ui->seasonal_decoration->addItem(tr("Лето"), "kupala");
     const int decorationIndex = ui->seasonal_decoration->findData(Configs::dataManager->settingsRepo->seasonal_decoration);
     ui->seasonal_decoration->setCurrentIndex(decorationIndex >= 0 ? decorationIndex : ui->seasonal_decoration->findData("auto"));
-    auto themeId = Configs::dataManager->settingsRepo->theme.toInt(&ok);
+    Configs::dataManager->settingsRepo->theme.toInt(&ok);
     if (ok) {
-        ui->theme->setCurrentIndex(themeId);
-    } else if (Mikan::isTheme(Configs::dataManager->settingsRepo->theme)) {
+        // A number was an index into the old list; the startup turns it into System.
+        ui->theme->setCurrentText(QStringLiteral("System"));
+    } else if (NewStyle::isTheme(Configs::dataManager->settingsRepo->theme) || Mikan::isTheme(Configs::dataManager->settingsRepo->theme)) {
         ui->theme->setCurrentIndex(ui->theme->findData(Configs::dataManager->settingsRepo->theme));
     } else {
         ui->theme->setCurrentText(Configs::dataManager->settingsRepo->theme);
     }
     // The new interface has no seasonal decoration.
-    const auto syncDecoration = [this] { ui->seasonal_decoration->setEnabled(!Mikan::isTheme(ui->theme->currentData().toString())); };
+    const auto syncDecoration = [this] {
+        const QString key = ui->theme->currentData().toString();
+        ui->seasonal_decoration->setEnabled(!NewStyle::isTheme(key) && !Mikan::isTheme(key));
+    };
     syncDecoration();
     connect(ui->theme, &QComboBox::currentIndexChanged, this, [=,this](int index) {
         // A new-interface item carries its key; the rest are named by their text.
@@ -452,6 +461,7 @@ DialogBasicSettings::DialogBasicSettings(QWidget *parent)
 
     ui->dns_in_port->setValidator(new QIntValidator(1, 65535, ui->dns_in_port));
     ui->dns_in_port->setText(Int2String(Configs::dataManager->settingsRepo->core_dns_in_port));
+    ui->dns_in_lan->setChecked(Configs::dataManager->settingsRepo->core_dns_in_lan);
 
     ui->core_box_clash_listen_addr->setText(Configs::dataManager->settingsRepo->core_box_clash_listen_addr);
     ui->core_box_clash_listen_addr->setPlaceholderText(tr("127.0.0.1 (default)"));
@@ -516,6 +526,16 @@ DialogBasicSettings::DialogBasicSettings(QWidget *parent)
     D_LOAD_BOOL(skip_cert)
 
     ui->tabWidget->addTab(new DiagnosticsTab(ui->tabWidget), tr("Diagnostics"));
+    if (ui->random_listen_port->isChecked()) UiMode::Unmark(ui->random_listen_port);
+    if (ui->disable_mixed_inbound->isChecked()) UiMode::Unmark(ui->disable_mixed_inbound);
+    if (ui->enable_custom_icon->isChecked()) {
+        for (QWidget *widget : {static_cast<QWidget *>(ui->enable_custom_icon), static_cast<QWidget *>(ui->select_custom_icon),
+                                static_cast<QWidget *>(ui->follow_status_in_taskbar)}) {
+            UiMode::Unmark(widget);
+        }
+    }
+    UiMode::Apply(this);
+    UiMode::Fold(this);
     bindValidation();
 
     auto resetDefaults = new QPushButton(tr("Восстановить настройки по умолчанию"), ui->tab_backup);
@@ -748,6 +768,9 @@ void DialogBasicSettings::accept() {
     Configs::dataManager->settingsRepo->enable_stats = ui->connection_statistics->isChecked();
     Configs::dataManager->settingsRepo->disable_traffic_aggregation = ui->disable_traffic_aggregation->isChecked();
     Configs::dataManager->settingsRepo->language = ui->language->currentIndex();
+    const bool simpleMode = ui->ui_mode->currentIndex() == 0;
+    const bool uiModeChanged = Configs::dataManager->settingsRepo->simple_mode != simpleMode;
+    Configs::dataManager->settingsRepo->simple_mode = simpleMode;
     auto oldUseCustomIcon = Configs::dataManager->settingsRepo->use_custom_icons;
     Configs::dataManager->settingsRepo->use_custom_icons = ui->enable_custom_icon->isChecked();
     if (oldUseCustomIcon != Configs::dataManager->settingsRepo->use_custom_icons) CACHE.updateTrayIcon = true;
@@ -787,6 +810,7 @@ void DialogBasicSettings::accept() {
 
     Configs::dataManager->settingsRepo->disable_traffic_stats = ui->disable_stats->isChecked();
     Configs::dataManager->settingsRepo->core_dns_in_port = ui->dns_in_port->text().trimmed().toInt();
+    Configs::dataManager->settingsRepo->core_dns_in_lan = ui->dns_in_lan->isChecked();
     Configs::dataManager->settingsRepo->core_box_clash_listen_addr = ui->core_box_clash_listen_addr->text().trimmed();
     Configs::dataManager->settingsRepo->core_box_clash_api = ui->core_box_clash_api->text().trimmed().toInt();
     Configs::dataManager->settingsRepo->core_box_clash_api_secret = ui->core_box_clash_api_secret->text().trimmed();
@@ -831,6 +855,7 @@ void DialogBasicSettings::accept() {
     if (profileListDisplayChanged) changes << MwArg::ProfileListDisplay;
     if (killSwitchChanged) changes << MwArg::KillSwitch;
     if (logFontChanged) changes << MwArg::LogFont;
+    if (uiModeChanged) changes << MwArg::UiMode;
     MW_dialog_message(MwMessage::UpdateSettings, changes);
     QDialog::accept();
 }

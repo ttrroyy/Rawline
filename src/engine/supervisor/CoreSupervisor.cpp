@@ -7,6 +7,7 @@
 #include "include/global/Configs.hpp"
 #include "include/global/Logger.hpp"
 #include "include/global/Notice.hpp"
+#include "include/sys/CoreElevation.hpp"
 #include "include/sys/KillSwitch.hpp"
 #include "include/sys/Process.hpp"
 
@@ -17,6 +18,7 @@
 
 #include <QCoreApplication>
 #include <QDebug>
+#include <QFileInfo>
 #include <QLocalServer>
 #include <QLocalSocket>
 #include <QMutexLocker>
@@ -330,7 +332,7 @@ namespace Engine {
 
     qint64 CoreSupervisor::corePid() const {
         QMutexLocker lock(&m_processMutex);
-        return m_process ? m_process->processId() : 0;
+        return m_process ? m_process->EffectivePid() : 0;
     }
 
     int CoreSupervisor::restartCount() const {
@@ -417,14 +419,8 @@ namespace Engine {
         }
         m_connectTimer->stop();
         setState(CoreState::Connected);
-#ifdef Q_OS_WIN
-        // Local and quick, and it writes windows_set_admin, so it stays here on the main thread.
-        LOG_INFO(QString("elevated: %1").arg(Configs::IsAdmin(true) ? "yes" : "no"));
-        emitCoreStarted();
-#else
         m_probing = true;
         startPrivilegeProbe(m_acceptedGen);
-#endif
     }
 
     void CoreSupervisor::startPrivilegeProbe(quint64 gen, int attempt) {
@@ -451,6 +447,15 @@ namespace Engine {
         if (ok) {
             Configs::SetKnownAdmin(privileged);
             if (coreSupervisorProbeReply) Configs::SetKnownCapabilities(*coreSupervisorProbeReply);
+            QMutexLocker lock(&m_processMutex);
+            const bool throughGrant = m_process && m_process->generation.load() == gen && m_process->through_grant.load();
+            Sys::CoreElevation::NoteCoreReport(throughGrant, privileged);
+        }
+        if (ok && coreSupervisorProbeReply && coreSupervisorProbeReply->corePid > 0) {
+            QMutexLocker lock(&m_processMutex);
+            if (m_process && m_process->AdoptElevatedPid(coreSupervisorProbeReply->corePid, gen)) {
+                LOG_INFO(QString("elevated core: PID %1 (stub PID %2)").arg(coreSupervisorProbeReply->corePid).arg(m_process->processId()));
+            }
         }
         QString elevated = QString("elevated: %1").arg(ok && privileged ? "yes" : "no");
         if (ok && coreSupervisorProbeReply && !coreSupervisorProbeReply->detail.isEmpty())
@@ -637,6 +642,12 @@ namespace Engine {
         if (wasConnected && m_connectedAt.isValid() && m_connectedAt.elapsed() >= kStableMs) m_failures = 0;
         ++m_failures;
         if (!wasConnected) ++m_startFailures;
+        // A core file that is not there will not appear by retrying: one error, then the restart waits for the user.
+        if (failedToStart && m_process && !QFileInfo(m_process->program).isFile()) {
+            m_startFailures = kGiveUpAfter;
+            m_lastCoreError = QStringLiteral("core not found: ") + m_process->program;
+            m_lastCoreErrorGen = gen;
+        }
 
         // A core that never connected never took the waiting start, and no profile can have brought it down.
         bool tooFrequent = false;
@@ -672,6 +683,7 @@ namespace Engine {
                                     : QStringLiteral("the core kept exiting");
                 if (m_lastCoreErrorGen == gen && !m_lastCoreError.isEmpty()) m_lastFailure += QStringLiteral("; last error: ") + m_lastCoreError;
             }
+            if (failedToStart && m_process && !QFileInfo(m_process->program).isFile()) m_lastFailure = tr("Core not found: %1").arg(m_process->program);
             MW_show_log("[ERROR] " + m_lastFailure);
             setState(CoreState::GaveUp);
             emit coreGaveUp(m_lastFailure);

@@ -26,6 +26,12 @@ namespace Configs {
             dns_optimistic_164_migrated = true;
             initialized = true;
         }
+        // 1.1 makes the Rawline OLED look the default once: a theme left at the old default (System) moves to it.
+        if (!theme_rawline_110_migrated) {
+            if (theme.isEmpty() || theme == QLatin1String("0") || theme.compare(QLatin1String("System"), Qt::CaseInsensitive) == 0) theme = QStringLiteral("NewOLED");
+            theme_rawline_110_migrated = true;
+            initialized = true;
+        }
         // 1.8.2 sets the test defaults once: 32 profiles at a time, 5 s for a ping and for a speed test.
         if (!test_defaults_182_migrated) {
             test_concurrent = 32;
@@ -58,6 +64,7 @@ namespace Configs {
             {"dns_optimistic_164_migrated", &dns_optimistic_164_migrated},
             {"test_defaults_182_migrated", &test_defaults_182_migrated},
             {"test_url_https_199_migrated", &test_url_https_199_migrated},
+            {"theme_rawline_110_migrated", &theme_rawline_110_migrated},
             {"vk_relay_linked", &vk_relay_linked},
             {"mrtt_max_risk_acknowledged", &mrtt_max_risk_acknowledged},
             {"disable_tray",                  &disable_tray},
@@ -82,6 +89,7 @@ namespace Configs {
             {"vpn_strict_route",              &vpn_strict_route},
             {"vpn_auto_redirect",             &vpn_auto_redirect},
             {"vpn_l3_bridge",                 &vpn_l3_bridge},
+            {"core_dns_in_lan",               &core_dns_in_lan},
             {"sub_clear",                     &sub_clear},
             {"sub_respect_server_interval",   &sub_respect_server_interval},
             {"sub_show_change_popup",         &sub_show_change_popup},
@@ -108,10 +116,13 @@ namespace Configs {
             {"use_dns_object",                &use_dns_object},
             {"skip_delete_confirmation",      &skip_delete_confirmation},
             {"show_config_security",          &show_config_security},
+            {"simple_mode",                   &simple_mode},
             {"log_enable_include",            &log_enable_include},
             {"log_enable_exclude",            &log_enable_exclude},
             {"enable_warp",                   &enable_warp},
             {"warp_tos_accepted",             &warp_tos_accepted},
+            {"warp_api_tls_fragment",         &warp_api_tls_fragment},
+            {"warp_api_tls_record_fragment",  &warp_api_tls_record_fragment},
             {"enable_dns_routing",            &enable_dns_routing},
             {"inbound_auth",                  &inbound_auth},
             {"allow_stopping_active_profile", &allow_stopping_active_profile},
@@ -171,6 +182,8 @@ namespace Configs {
             {"speed_test_timeout_ms",  &speed_test_timeout_ms},
             {"url_test_timeout_ms",    &url_test_timeout_ms},
             {"xray_mux_concurrency",   &xray_mux_concurrency},
+            {"xray_mux_max_connections", &xray_mux_max_connections},
+            {"xray_mux_xudp_concurrency", &xray_mux_xudp_concurrency},
             {"current_route_id",       &current_route_id},
             {"ruleset_mirror",         &ruleset_mirror},
             {"core_dns_in_port",       &core_dns_in_port},
@@ -184,6 +197,14 @@ namespace Configs {
             {"vk_hash_selection", &vk_hash_selection},
             {"qwdtt_hash_source", &qwdtt_hash_source},
             {"relay_device_id", &relay_device_id},
+            {"new_layout_panel", &new_layout_panel},
+            {"new_layout_chip", &new_layout_chip},
+            {"new_layout_controls", &new_layout_controls},
+            {"relay_default_qwdtt_mode", &relay_default_qwdtt_mode},
+            {"relay_default_wdttplus_mode", &relay_default_wdttplus_mode},
+            {"relay_default_csqtt_transport", &relay_default_csqtt_transport},
+            {"relay_default_csqtt_srtp", &relay_default_csqtt_srtp},
+            {"relay_default_mrtt_transport", &relay_default_mrtt_transport},
             {"user_agent2",                &user_agent},
             {"test_url",                   &test_latency_url},
             {"direct_test_url",            &direct_test_url},
@@ -193,6 +214,7 @@ namespace Configs {
             {"log_file_level",             &log_file_level},
             {"mux_protocol",               &mux_protocol},
             {"mux_mode",                   &mux_mode},
+            {"xray_mux_xudp_proxy_udp443", &xray_mux_xudp_proxy_udp443},
             {"fragment_implementation",    &fragment_implementation},
             {"fragment_size",              &fragment_size},
             {"fragment_sleep",             &fragment_sleep},
@@ -259,6 +281,7 @@ namespace Configs {
             {"warp_masque_peer_public_key", &warp_masque_peer_public_key},
             {"warp_masque_ep",             &warp_masque_ep},
             {"warp_masque_sni",            &warp_masque_sni},
+            {"warp_api_tls_fragment_fallback_delay", &warp_api_tls_fragment_fallback_delay},
             {"inbound_user",               &inbound_user},
             {"inbound_pass",               &inbound_pass},
             {"url_scheme_mirror",          &url_scheme_mirror},
@@ -285,6 +308,7 @@ namespace Configs {
             {"warp_reserved", &warp_reserved},
             {"warp_masque_ifc_addrs", &warp_masque_ifc_addrs},
             {"warp_api_hosts", &warp_api_hosts},
+            {"warp_amnezia_packets", &warp_amnezia_packets},
         };
     }
 
@@ -301,7 +325,9 @@ namespace Configs {
         auto query = db.query("SELECT key, value FROM settings");
         if (!query) return;
 
+        bool freshInstall = true;
         while (query->executeStep()) {
+            freshInstall = false;
             const QString key = QString::fromStdString(query->getColumn(0).getText());
             const QString str = QString::fromStdString(query->getColumn(1).getText());
 
@@ -360,6 +386,7 @@ namespace Configs {
                 continue;
             }
         }
+        if (freshInstall) simple_mode = true;
         // Builds before 1.2.1 saved the translated interval label ("5 мин.", "۱۰ دقیقه"), which the core rejects.
         if (!Validation::Duration(ntp_interval).isEmpty()) {
             QString minutes;
@@ -428,6 +455,7 @@ namespace Configs {
     bool SettingsRepo::Save() {
         std::lock_guard<std::recursive_mutex> lock(db.WriteMutex());
         saveAllSettings();
+        ++revision;
         return true;
     }
 
