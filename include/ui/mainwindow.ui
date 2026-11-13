@@ -1213,7 +1213,7 @@ QToolButton::menu-indicator {
   </action>
   <action name="menu_vk_relay_settings">
    <property name="text">
-    <string>Настройки VK-релея</string>
+    <string>Деплой протоколов</string>
    </property>
   </action>
   <action name="menu_otp_manager">

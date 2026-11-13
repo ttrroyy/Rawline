@@ -231,7 +231,7 @@ class PanelDeploy : public QDialog {
         back->setVisible(index != Server && !(index == Progress));
         back->setEnabled(!busy && !history.isEmpty());
         next->setVisible(index != Server && index != Progress);
-        next->setText(index == Check ? QStringLiteral("Установить") : QStringLiteral("Далее"));
+        next->setText(index != Check ? QStringLiteral("Далее") : goal == "reinstall" ? QStringLiteral("Установить заново") : QStringLiteral("Установить"));
         next->setEnabled(!busy && (index != Check || checkPassed));
         stop->setEnabled(busy);
         recheck->setEnabled(!busy);
@@ -628,6 +628,17 @@ class PanelDeploy : public QDialog {
     }
 
     // The server's page: what is installed, the panel's address and login, adding and removing parts.
+    // Installing again over what the VPS runs: the same role, access, domain, protocols and DNS zone, straight to the check.
+    void reinstall() {
+        goal = "reinstall";
+        set("role", value("installedRole"));
+        set("access", value("mode").isEmpty() ? "local" : value("mode"));
+        set("domain", value("installedDomain"));
+        set("protocols", value("installedProtocols"));
+        set("dnsZone", value("installedZone"));
+        set("dnsNs", value("installedNs"));
+        go(Check);
+    }
     void startAdd(const QString &part) {
         // The installer keeps the other part's settings: the node's protocols, the panel's access and domain.
         goal = part == "node" ? "add-node" : "add-panel";
@@ -795,6 +806,13 @@ class PanelDeploy : public QDialog {
             auto *installButton = new QPushButton("Установить", serverBody);
             connect(installButton, &QPushButton::clicked, this, [this] { goal = "install"; go(Role); });
             actions->addWidget(installButton);
+        }
+        if (!role.isEmpty()) {
+            // Updating is installing again with what is installed: users and settings stay.
+            auto *again = new QPushButton("Установить заново (обновить)", serverBody);
+            again->setToolTip("Переустановит с теми же параметрами: компоненты, протоколы, доступ и домен. Пользователи, подписки и настройки панели сохранятся.");
+            connect(again, &QPushButton::clicked, this, [this] { reinstall(); });
+            actions->addWidget(again);
         }
         if (role == "panel" || role == "node") {
             auto *add = new QPushButton(role == "panel" ? "Добавить ноду" : "Добавить панель", serverBody);

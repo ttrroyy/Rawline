@@ -23,6 +23,7 @@
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QFontDatabase>
+#include <QTabBar>
 #include <QFormLayout>
 #include <QHBoxLayout>
 #include <QInputDialog>
@@ -268,7 +269,7 @@ void RelayPickHashes(QWidget *parent, const QString &type, const QString &server
     const auto created = relayCreatedHashes(&error);
     if (!error.isEmpty()) { QMessageBox::warning(parent, QStringLiteral("Хеши профиля"), error); return; }
     if (created.isEmpty()) {
-        QMessageBox::information(parent, QStringLiteral("Хеши профиля"), QStringLiteral("Созданных хешей пока нет. Создайте их в настройках VK-релея, вкладка генерации хешей."));
+        QMessageBox::information(parent, QStringLiteral("Хеши профиля"), QStringLiteral("Созданных хешей пока нет. Создайте их в окне «Деплой протоколов», вкладка привязок и хешей."));
         return;
     }
     const auto key = relayHashKey(type, server, port);
@@ -637,13 +638,13 @@ bool SaveVKRelayPreviews(const QString &directory) {
 }
 
 DialogVKRelay::DialogVKRelay(QWidget *parent) : QDialog(parent) {
-    setWindowTitle("Настройки VK-релея");
+    setWindowTitle("Деплой протоколов");
     resize(860, 600);
     auto *layout = new QVBoxLayout(this);
     auto *tabs = new QTabWidget(this);
     layout->addWidget(tabs);
     auto *accountPage = new QWidget(tabs);
-    tabs->addTab(accountPage, "Аккаунт и хеши");
+    tabs->addTab(accountPage, "Привязки VK и MAX, хеши");
     auto *accountLayout = new QVBoxLayout(accountPage);
     auto *accountGroup = new QGroupBox("Аккаунт VK", accountPage);
     accountLayout->addWidget(accountGroup);
@@ -820,6 +821,7 @@ DialogVKRelay::DialogVKRelay(QWidget *parent) : QDialog(parent) {
     {
         // The mode each relay protocol takes when a link or a new profile names none.
         auto *page = new QWidget(tabs);
+        page->setObjectName("relayModesPage");
         tabs->addTab(page, "Режимы по умолчанию");
         auto *form = new QFormLayout(page);
         auto *note = new QLabel("Режим, который получают новые и импортированные профили, если ссылка его не задаёт. "
@@ -905,5 +907,9 @@ DialogVKRelay::DialogVKRelay(QWidget *parent) : QDialog(parent) {
         });
     }
     layout->addWidget(status);
+    // The deploy first, then the modes of new profiles, then the VK / MAX bindings and the call hashes.
+    tabs->tabBar()->moveTab(tabs->indexOf(tabs->findChild<QWidget *>("panelDeployPage")), 0);
+    tabs->tabBar()->moveTab(tabs->indexOf(tabs->findChild<QWidget *>("relayModesPage")), 1);
+    tabs->setCurrentIndex(0);
     connect(this, &QDialog::finished, accountTask, &RelayTask::cancel);
 }
