@@ -16,6 +16,8 @@
 #include "include/engine/tests/TestRunner.h"
 
 #include <QMenu>
+#include <QToolTip>
+#include <QCursor>
 #include "include/ui/setting/dialog_basic_settings.h"
 
 #include "include/configs/sub/GroupUpdater.hpp"
@@ -973,7 +975,17 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWi
                 action->setData(route->id);
                 action->setProperty("routeProfileId", route->id);
                 action->setCheckable(true);
-                connect(action, &QAction::triggered, this, [=,this]() { connection()->chooseRoute(action->data().toInt()); });
+                connect(action, &QAction::triggered, this, [=,this]() {
+                    // While the subscription's own routing decides, a client profile says so instead of changing nothing.
+                    bool fromProvider = false;
+                    if (const auto group = Configs::dataManager->groupsRepo->CurrentGroup()) NewHome::routeText(group, &fromProvider);
+                    if (fromProvider) {
+                        action->setChecked(false);
+                        QToolTip::showText(QCursor::pos(), tr("The routing of the subscription is in use now"));
+                        return;
+                    }
+                    connection()->chooseRoute(action->data().toInt());
+                });
                 ui->menuRouting_Menu->addAction(action);
                 routeActions.append(action);
             }
@@ -986,7 +998,6 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWi
         actionProviderRoute->setChecked(fromProvider);
         for (auto* action : routeActions) {
             action->setChecked(!fromProvider && Configs::dataManager->settingsRepo->current_route_id == action->data().toInt());
-            action->setEnabled(!fromProvider);
         }
     });
     connect(ui->actionClear_Test_Result, &QAction::triggered, this, [=, this]() { clear_test_results(get_now_selected_list()); });

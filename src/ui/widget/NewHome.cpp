@@ -1488,17 +1488,7 @@ void NewHome::buildSide(QVBoxLayout *side) {
     m_add->setIconName("add");
     m_add->setToolTip(T("Add"));
     connect(m_add, &QAbstractButton::clicked, this, [this] { showAddMenu(); });
-    // The routing profiles beside the subscription, as on the phone; the menu shows the provider's routing when it decides.
-    auto *routing = new NewTile(NewTile::Icon);
-    m_routeButton = routing;
-    routing->setIconName("route");
-    routing->setToolTip(T("Routing"));
-    connect(routing, &QAbstractButton::clicked, this, [this, routing] {
-        guardReopen(mw->ui->menuRouting_Menu, routing);
-        mw->ui->menuRouting_Menu->popup(routing->mapToGlobal(QPoint(0, routing->height() + 6)));
-    });
     chipRow->addWidget(m_chip, 1);
-    chipRow->addWidget(routing);
     chipRow->addWidget(m_add);
     chipRow->setContentsMargins(0, 14, 0, 0);
     m_chipBox = new QWidget;
@@ -1635,7 +1625,8 @@ void NewHome::buildBody(QVBoxLayout *body) {
     m_routeLine = label({}, 11, true);
     m_routeLine->setContentsMargins(14, 0, 14, 8);
     m_routeLine->setCursor(Qt::PointingHandCursor);
-    // Elided to the panel's width (eventFilter), so a long profile name never widens the panel.
+    // Wraps rather than cutting the label off; wrapped, a long profile name never widens the panel either.
+    m_routeLine->setWordWrap(true);
     m_routeLine->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
     m_routeLine->installEventFilter(this);
     serversLayout->addWidget(m_routeLine);
@@ -1859,13 +1850,6 @@ QString NewHome::routeText(const std::shared_ptr<Configs::Group> &group, bool *f
     return group->url.isEmpty() ? QString() : T("Routing: %1").arg(name) + rest;
 }
 
-void NewHome::openRouting() {
-    const auto group = Configs::dataManager->groupsRepo->CurrentGroup();
-    if (!group) return;
-    if (m_routeFromProvider) mw->editSubscriptionRouting(group->id);
-    else mw->ui->menu_routing_settings->trigger();
-}
-
 void NewHome::refreshGroupHeader() {
     const auto group = Configs::dataManager->groupsRepo->CurrentGroup();
     if (!group) return;
@@ -1877,7 +1861,7 @@ void NewHome::refreshGroupHeader() {
         .arg(sub.announce, sub.support_url).arg(int(mw_sub_updating) * 2 + int(m_announceOpen)).arg(route);
     m_routeLine->setVisible(!route.isEmpty());
     m_routeLine->setToolTip(route);
-    m_routeLine->setText(QFontMetrics(m_routeLine->font()).elidedText(route, Qt::ElideRight, m_routeLine->contentsRect().width()));
+    m_routeLine->setText(route);
     m_refresh->setSpinning(subscription && mw_sub_updating);
     if (key == m_headerKey) return;
     m_headerKey = key;
@@ -2431,17 +2415,6 @@ void NewHome::applyArrangement() {
     m_chipBox->layout()->setContentsMargins(0, 14, 0, 0);
     m_chipBox->show();
     m_orb->setFixedHeight(settings.new_layout_size == QLatin1String("compact") ? 148 : 190);
-    // Taken away, a part is gone from the window; while arranging it stays faded, with a plus to bring it back.
-    const auto hidden = settings.new_layout_hidden.split(',', Qt::SkipEmptyParts);
-    const auto show = [this](QWidget *widget, bool on) {
-        widget->setVisible(on || m_arrange);
-        auto *fade = qobject_cast<QGraphicsOpacityEffect *>(widget->graphicsEffect());
-        if (!on && m_arrange) {
-            if (!fade) { fade = new QGraphicsOpacityEffect(widget); widget->setGraphicsEffect(fade); }
-            fade->setOpacity(.35);
-        } else if (fade) widget->setGraphicsEffect(nullptr);
-    };
-    if (m_routeButton) show(m_routeButton, !hidden.contains(QStringLiteral("route")));
 }
 
 void NewHome::setArranging(bool on) {
@@ -2455,26 +2428,15 @@ void NewHome::setArranging(bool on) {
     };
     auto *overlay = new ArrangeOverlay(this, [this] { setArranging(false); }, [this] { new ArrangeTutorial(this, {}); });
     // The panel is the one block: dropped in the left, middle or right third of the window, it stands there and
-    // the servers and tabs take the rest. The connect button only changes size; the routing button can go.
+    // the servers and tabs take the rest. The connect button only changes size.
     overlay->addBlock(m_side, [=, &settings](QPoint at) {
         set(settings.new_layout_panel, at.x() < width() / 3 ? QStringLiteral("left") : at.x() > width() * 2 / 3 ? QStringLiteral("right") : QStringLiteral("center"));
     });
-    // Takes the routing button away or brings it back.
-    const auto toggle = [=, &settings](const QString &part) {
-        auto hidden = settings.new_layout_hidden.split(',', Qt::SkipEmptyParts);
-        if (hidden.contains(part)) hidden.removeAll(part); else hidden << part;
-        set(settings.new_layout_hidden, hidden.join(','));
-    };
     overlay->rebuild = [=, &settings] {
         overlay->clearButtons();
-        const auto hidden = settings.new_layout_hidden.split(',', Qt::SkipEmptyParts);
         const bool compact = settings.new_layout_size == QLatin1String("compact");
         overlay->addButton(m_orb, compact ? QStringLiteral("⤢") : QStringLiteral("⤡"), T("Change size"),
                            [=, &settings] { set(settings.new_layout_size, compact ? QStringLiteral("normal") : QStringLiteral("compact")); });
-        if (m_routeButton) {
-            const bool gone = hidden.contains(QStringLiteral("route"));
-            overlay->addButton(m_routeButton, gone ? QStringLiteral("+") : QStringLiteral("−"), gone ? T("Bring back") : T("Take away"), [=] { toggle(QStringLiteral("route")); });
-        }
     };
     overlay->rebuild();
     overlay->setGeometry(rect());
@@ -2538,10 +2500,13 @@ bool NewHome::eventFilter(QObject *watched, QEvent *event) {
     if (event->type() == QEvent::MouseButtonPress && static_cast<QMouseEvent *>(event)->button() == Qt::LeftButton) {
         if (watched == m_check) { checkCurrentConnection(); return true; }
         if (watched == m_announce) { m_announceOpen = !m_announceOpen; refreshGroupHeader(); return true; }
-        if (watched == m_routeLine) { openRouting(); return true; }
+        // The routing line opens the routing menu under it: the profiles, the provider's routing when it decides.
+        if (watched == m_routeLine) {
+            guardReopen(mw->ui->menuRouting_Menu, m_routeLine);
+            mw->ui->menuRouting_Menu->popup(m_routeLine->mapToGlobal(QPoint(8, m_routeLine->height())));
+            return true;
+        }
     }
-    if (watched == m_routeLine && event->type() == QEvent::Resize)
-        m_routeLine->setText(QFontMetrics(m_routeLine->font()).elidedText(m_routeLine->toolTip(), Qt::ElideRight, m_routeLine->contentsRect().width()));
     return QWidget::eventFilter(watched, event);
 }
 

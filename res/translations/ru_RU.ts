@@ -9512,6 +9512,10 @@ Improves hole-punching reliability. Requires IPv4.</source>
 <context>
     <name>MainWindow</name>
     <message>
+        <source>The routing of the subscription is in use now</source>
+        <translation>Сейчас действует маршрутизация подписки</translation>
+    </message>
+    <message>
         <source>Pin</source>
         <translation>Закрепить</translation>
     </message>

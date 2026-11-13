@@ -383,8 +383,6 @@ namespace Configs {
         // A smaller connect button ("compact") and the arranging tutorial seen ("seen").
         QString new_layout_size = "normal";
         QString new_layout_tutorial;
-        // The parts taken away in arranging, comma-separated: "route" (the routing button beside the subscription).
-        QString new_layout_hidden;
         // Comma-separated ids of the profiles shown first in their group.
         QString pinned_profiles;
         QString relay_default_qwdtt_mode = "wg";
