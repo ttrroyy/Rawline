@@ -153,6 +153,8 @@ class PanelDeploy : public QDialog {
     QProgressBar *progress;
     QPlainTextEdit *console;
     QPushButton *stop;
+    // «К серверу» on the log: dim and untouchable while the operation runs.
+    QPushButton *toServer;
     // Server
     QWidget *serverBody;
 
@@ -235,6 +237,8 @@ class PanelDeploy : public QDialog {
         next->setText(index != Check ? QStringLiteral("Далее") : goal == "reinstall" ? QStringLiteral("Установить / Обновить") : QStringLiteral("Установить"));
         next->setEnabled(!busy && (index != Check || checkPassed));
         stop->setEnabled(busy);
+        stop->setVisible(busy);
+        toServer->setEnabled(!busy);
         recheck->setEnabled(!busy);
         if (index == Connect) for (auto *edit : fields) edit->setEnabled(!busy);
     }
@@ -506,7 +510,13 @@ class PanelDeploy : public QDialog {
         console->setFont(QFontDatabase::systemFont(QFontDatabase::FixedFont));
         layout->addWidget(console, 1);
         stop = new QPushButton("Остановить", widget);
-        layout->addWidget(stop, 0, Qt::AlignLeft);
+        toServer = new QPushButton("К серверу", widget);
+        auto *row = new QHBoxLayout;
+        row->addWidget(stop);
+        row->addStretch();
+        row->addWidget(toServer);
+        layout->addLayout(row);
+        connect(toServer, &QPushButton::clicked, this, [this] { if (!busy) go(Server); });
         connect(stop, &QPushButton::clicked, this, [this] {
             if (QMessageBox::question(this, "Остановить", "Остановить операцию? Уже выполненные изменения на VPS сохранятся, установку можно запустить снова.") == QMessageBox::Yes)
                 task->cancel();
@@ -605,13 +615,11 @@ class PanelDeploy : public QDialog {
                 step->setText(failure);
                 console->appendPlainText("\n" + failure);
                 fail(failure);
-                // The page stays for the log; the server page shows what is installed now.
-                auto *open = new QPushButton("К серверу", pages->widget(Progress));
-                qobject_cast<QVBoxLayout *>(pages->widget(Progress)->layout())->addWidget(open, 0, Qt::AlignLeft);
-                connect(open, &QPushButton::clicked, this, [this, open] { open->deleteLater(); go(Server); });
                 return;
             }
-            go(Server);
+            // The log stays; «К серверу» opens what is installed now.
+            step->setText("Готово");
+            progress->setValue(100);
         });
     }
     void forward() {
@@ -664,8 +672,13 @@ class PanelDeploy : public QDialog {
         step->setText("Удаление");
         go(Progress);
         call("uninstall-" + target, {}, [this](const QString &failure) {
-            go(Server);
-            if (!failure.isEmpty()) fail(failure);
+            if (!failure.isEmpty()) {
+                step->setText(failure);
+                fail(failure);
+                return;
+            }
+            step->setText("Готово");
+            progress->setValue(100);
         });
     }
     void changeLogin() {
