@@ -2154,8 +2154,6 @@ namespace Configs {
             int singToXrayPort = -1;
             int xrayToSingPort = -1;
             int xrayFullConfigPort = -1;
-            // Sibling configs from one subscription repeat these ports and would fail to bind.
-            bool soleXrayInbound = false;
             bool warpWrap = false;
             bool auxiliary = false;
             QSet<QString> addressableTags;
@@ -2216,9 +2214,10 @@ namespace Configs {
                     {"destOverride", QJsonArray{"http", "tls", "quic"}},
                     {"routeOnly", false}
                 };
-                auto inbounds = (ctx.forTest || req.soleXrayInbound) ? QJsonArray()
-                                                                     : userXrayConfig["inbounds"].toArray();
-                inbounds.prepend(bridgeInbound);
+                // The config's own inbounds are never started: a provider's SOCKS on 127.0.0.1:10808 without a password
+                // would carry any local program, one the routing sends direct too, through the server. Rawline reaches
+                // the config only through its own bridges, each with a random password.
+                QJsonArray inbounds{bridgeInbound};
                 userXrayConfig["inbounds"] = inbounds;
                 if (dataManager->settingsRepo->xray_use_system_ca) {
                     auto outbounds = userXrayConfig["outbounds"].toArray();
@@ -2549,7 +2548,6 @@ namespace Configs {
                     .singToXrayPort = singToXrayPort,
                     .xrayToSingPort = xrayToSingPort,
                     .xrayFullConfigPort = xrayFullConfigPort,
-                    .soleXrayInbound = bridges.xrayFullConfig,
                     .tailDetour = req.upstreamTag,
                     .tailResolvesViaDns = req.upstreamResolvesViaDns,
                 });

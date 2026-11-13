@@ -463,7 +463,7 @@ int TestQwdttImport() {
         check(Configs::dataManager->settingsRepo->current_route_id == globalRoute && Configs::dataManager->settingsRepo->remote_dns == globalDNS, "provider routing does not mutate global routing or DNS");
         {
             // A client rule to proxy beats the full Xray config's own "ru -> direct"; everything else keeps the provider's routing.
-            auto full = parse(R"({"remarks":"RU split","outbounds":[{"protocol":"vless","tag":"proxy","settings":{"vnext":[{"address":"example.net","port":443,"users":[{"id":"00000000-0000-0000-0000-000000000001"}]}]}},{"protocol":"freedom","tag":"direct"},{"protocol":"blackhole","tag":"block"}],"routing":{"rules":[{"type":"field","ip":["10.0.0.0/8"],"outboundTag":"direct"},{"type":"field","domain":["ads.example"],"outboundTag":"block"}]}})");
+            auto full = parse(R"({"remarks":"RU split","inbounds":[{"tag":"socks-in","protocol":"socks","listen":"127.0.0.1","port":10808,"settings":{"auth":"noauth"}}],"outbounds":[{"protocol":"vless","tag":"proxy","settings":{"vnext":[{"address":"example.net","port":443,"users":[{"id":"00000000-0000-0000-0000-000000000001"}]}]}},{"protocol":"freedom","tag":"direct"},{"protocol":"blackhole","tag":"block"}],"routing":{"rules":[{"type":"field","ip":["10.0.0.0/8"],"outboundTag":"direct"},{"type":"field","domain":["ads.example"],"outboundTag":"block"}]}})");
             check(full.size() == 1 && full.first()->Custom() && full.first()->Custom()->IsXrayFullConfig(), "explicit routing fixture parses");
             auto explicitGroup = Configs::GroupsRepo::NewGroup(); explicitGroup->name = "Explicit rules";
             check(Configs::dataManager->groupsRepo->AddGroup(explicitGroup), "explicit routing group saved");
@@ -494,6 +494,10 @@ int TestQwdttImport() {
                 check(hasInbound && !xrayRules.isEmpty() && xrayRules.first().toObject()["outboundTag"].toString() == "block"
                       && xrayRules.first().toObject()["inboundTag"].toArray().first().toString() == "rawline-bridge-rules",
                       "explicit inbound keeps blocks and drops direct exits");
+                bool providerInbound = false;
+                for (const auto &inbound : built->xrayConfig["inbounds"].toArray())
+                    if (inbound.toObject()["tag"].toString() == "socks-in" || inbound.toObject()["port"].toInt() == 10808) providerInbound = true;
+                check(!providerInbound, "the config's own open SOCKS inbound is not started");
                 int directForExplicit = 0;
                 for (const auto &rule : xrayRules) {
                     const auto object = rule.toObject();
