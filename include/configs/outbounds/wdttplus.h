@@ -49,7 +49,7 @@ public:
     QString ExportToLink() override;
     QString DisplayType() override {
         if (!legacy) return "WDTT Plus";
-        return engine == "qwdtt" ? QString("WDTT · qWDTT (") + (mode == "raw" ? "RAW" : "WG") + ")" : "WDTT";
+        return engine == "qwdtt" ? QString("WDTT · qWDTT (") + (mode == "raw" ? "RAW" : "WG") + ")" : "WDTT Plus";
     }
     SecurityInfo GetSecurity() override { return {"DTLS", "TURN", SecurityLevel::Secure}; }
     QString Prepare();
