@@ -210,6 +210,7 @@ public:
 
 protected:
     void paintEvent(QPaintEvent *) override;
+    void resizeEvent(QResizeEvent *) override;
     void mouseMoveEvent(QMouseEvent *) override;
     void mousePressEvent(QMouseEvent *) override;
     void leaveEvent(QEvent *) override;
@@ -230,6 +231,8 @@ private:
     void updateNotice();
     // Puts the panel, the subscription card and the connect block where the settings say.
     void applyArrangement();
+    // Centered, the column keeps a phone's width in the middle of the window.
+    void updateCentering();
     void setArranging(bool on);
 
     MainWindow *mw;
@@ -241,6 +244,8 @@ private:
     QWidget *m_chipBox = nullptr;
     QWidget *m_controls = nullptr;
     QWidget *m_arrange = nullptr;
+    // The routing button beside the subscription, which arranging can take away.
+    NewTile *m_routeButton = nullptr;
     bool m_attached = false;
     struct Slot { QBoxLayout *layout = nullptr; int index = -1; int stretch = 0; };
     Slot m_dataSlot, m_statsSlot;

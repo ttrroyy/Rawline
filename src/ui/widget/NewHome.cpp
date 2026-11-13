@@ -1490,6 +1490,7 @@ void NewHome::buildSide(QVBoxLayout *side) {
     connect(m_add, &QAbstractButton::clicked, this, [this] { showAddMenu(); });
     // The routing profiles beside the subscription, as on the phone; the menu shows the provider's routing when it decides.
     auto *routing = new NewTile(NewTile::Icon);
+    m_routeButton = routing;
     routing->setIconName("route");
     routing->setToolTip(T("Routing"));
     connect(routing, &QAbstractButton::clicked, this, [this, routing] {
@@ -2122,8 +2123,8 @@ namespace {
     // its place, small buttons on the parts that change, the tutorial link and Done. The window takes no other clicks.
     class ArrangeOverlay : public QWidget {
     public:
-        struct Block { QPointer<QWidget> widget; std::function<void(QPoint)> drop; };
-        struct Button { NewTile *tile; QPointer<QWidget> anchor; };
+        struct Block { QPointer<QWidget> widget; std::function<void(QPoint)> drop; std::function<void()> twice; };
+        struct Button { NewTile *tile; QPointer<QWidget> anchor; int slot = 0; };
         ArrangeOverlay(QWidget *parent, std::function<void()> done, std::function<void()> tutorial) : QWidget(parent) {
             m_done = new NewTile(NewTile::Chip, this);
             m_done->setText(QCoreApplication::translate("NewHome", "Done"));
@@ -2139,16 +2140,17 @@ namespace {
             setMouseTracking(true);
             parent->installEventFilter(this);
         }
-        void addBlock(QWidget *widget, std::function<void(QPoint)> drop) { m_blocks << Block{widget, std::move(drop)}; }
-        // A round button in [anchor]'s top right corner.
-        void addButton(QWidget *anchor, const QString &glyph, const QString &tip, std::function<void()> action) {
+        // [twice]: what a double click on the block changes, as two taps do in the mobile editor.
+        void addBlock(QWidget *widget, std::function<void(QPoint)> drop, std::function<void()> twice = {}) { m_blocks << Block{widget, std::move(drop), std::move(twice)}; }
+        // A round button in [anchor]'s top right corner, [slot] buttons to the left of it.
+        void addButton(QWidget *anchor, const QString &glyph, const QString &tip, std::function<void()> action, int slot = 0) {
             auto *tile = new NewTile(NewTile::Chip, this);
             tile->setText(glyph);
             tile->setToolTip(tip);
             tile->setFixedSize(30, 30);
             connect(tile, &QAbstractButton::clicked, this, [this, action = std::move(action)] { action(); rebuild(); });
             tile->show();
-            m_buttons << Button{tile, anchor};
+            m_buttons << Button{tile, anchor, slot};
             place();
         }
         void clearButtons() {
@@ -2184,15 +2186,27 @@ namespace {
             if (watched == parentWidget() && event->type() == QEvent::Resize) setGeometry(parentWidget()->rect());
             return false;
         }
-        void mousePressEvent(QMouseEvent *event) override {
-            event->accept();
-            // The innermost block under the mouse: the panel holds the others.
+        // The innermost block under the mouse: the panel holds the others.
+        int blockAt(QPoint at) const {
             int best = -1;
             for (int i = 0; i < m_blocks.size(); ++i) {
                 const auto &block = m_blocks[i];
-                if (!block.widget || !block.widget->isVisible() || !frameOf(block).contains(event->pos())) continue;
+                if (!block.widget || !block.widget->isVisible() || !frameOf(block).contains(at)) continue;
                 if (best < 0 || frameOf(block).width() * frameOf(block).height() < frameOf(m_blocks[best]).width() * frameOf(m_blocks[best]).height()) best = i;
             }
+            return best;
+        }
+        void mouseDoubleClickEvent(QMouseEvent *event) override {
+            event->accept();
+            m_dragged = -1;
+            m_ghost = {};
+            const int best = blockAt(event->pos());
+            if (best >= 0 && m_blocks[best].twice) { m_blocks[best].twice(); rebuild(); }
+            update();
+        }
+        void mousePressEvent(QMouseEvent *event) override {
+            event->accept();
+            const int best = blockAt(event->pos());
             if (best < 0) return;
             m_dragged = best;
             m_ghost = m_blocks[best].widget->grab();
@@ -2227,7 +2241,7 @@ namespace {
             for (const auto &button : m_buttons) {
                 if (!button.anchor) { button.tile->hide(); continue; }
                 const QRect frame(mapFromGlobal(button.anchor->mapToGlobal(QPoint())), button.anchor->size());
-                button.tile->move(frame.right() - button.tile->width() + 8, frame.top() - 10);
+                button.tile->move(frame.right() - button.tile->width() + 8 - button.slot * (button.tile->width() + 6), frame.top() - 10);
                 button.tile->setVisible(true);
                 button.tile->raise();
             }
@@ -2382,16 +2396,32 @@ namespace {
     };
 }
 
+void NewHome::updateCentering() {
+    const bool centered = Configs::dataManager->settingsRepo->new_layout_panel == QLatin1String("center");
+    const int margin = centered ? std::max(0, (width() - 32 - 480) / 2) : 0;
+    m_columns->setContentsMargins(margin, 0, margin, 0);
+}
+
 void NewHome::applyArrangement() {
     const auto &settings = *Configs::dataManager->settingsRepo;
+    // Left or right of the servers, or above them in one narrow column as on the phone.
+    const bool centered = settings.new_layout_panel == QLatin1String("center");
+    m_columns->setDirection(centered ? QBoxLayout::TopToBottom : QBoxLayout::LeftToRight);
     m_columns->removeWidget(m_side);
-    m_columns->insertWidget(settings.new_layout_panel == QLatin1String("right") ? 1 : 0, m_side);
-    // The panel's order: header, card on top, the connect block, room, card at the bottom, the status lines.
+    m_columns->insertWidget(settings.new_layout_panel == QLatin1String("right") ? 1 : 0, m_side, 0);
+    if (centered) { m_side->setMinimumWidth(0); m_side->setMaximumWidth(QWIDGETSIZE_MAX); }
+    else m_side->setFixedWidth(300);
+    updateCentering();
+    // The panel's order: header on top, card on top, the connect block, room, card at the bottom, header at the
+    // bottom, the status lines.
+    m_sideLayout->removeWidget(m_header);
     m_sideLayout->removeWidget(m_chipBox);
     m_bodyLayout->removeWidget(m_chipBox);
     m_sideLayout->removeWidget(m_controls);
     for (int i = m_sideLayout->count() - 1; i >= 0; --i) if (m_sideLayout->itemAt(i)->spacerItem()) delete m_sideLayout->takeAt(i);
-    int at = m_sideLayout->indexOf(m_header) + 1;
+    int at = 0;
+    const bool headerBottom = settings.new_layout_header == QLatin1String("bottom");
+    if (!headerBottom) m_sideLayout->insertWidget(at++, m_header);
     const QString chip = settings.new_layout_chip;
     if (chip == QLatin1String("top")) m_sideLayout->insertWidget(at++, m_chipBox);
     if (settings.new_layout_controls == QLatin1String("bottom")) {
@@ -2402,14 +2432,26 @@ void NewHome::applyArrangement() {
         m_sideLayout->insertStretch(at++, 1);
     }
     if (chip == QLatin1String("bottom")) m_sideLayout->insertWidget(at++, m_chipBox);
+    if (headerBottom) m_sideLayout->insertWidget(at++, m_header);
     if (chip == QLatin1String("list")) m_bodyLayout->insertWidget(0, m_chipBox);
     m_chipBox->layout()->setContentsMargins(0, chip == QLatin1String("list") ? 0 : 14, 0, chip == QLatin1String("list") ? 10 : 0);
     m_chipBox->show();
     m_orb->setFixedHeight(settings.new_layout_size == QLatin1String("compact") ? 148 : 190);
+    // Taken away, a part is gone from the window; while arranging it stays faded, with a plus to bring it back.
+    const auto hidden = settings.new_layout_hidden.split(',', Qt::SkipEmptyParts);
+    const auto show = [this](QWidget *widget, bool on) {
+        widget->setVisible(on || m_arrange);
+        auto *fade = qobject_cast<QGraphicsOpacityEffect *>(widget->graphicsEffect());
+        if (!on && m_arrange) {
+            if (!fade) { fade = new QGraphicsOpacityEffect(widget); widget->setGraphicsEffect(fade); }
+            fade->setOpacity(.35);
+        } else if (fade) widget->setGraphicsEffect(nullptr);
+    };
+    if (m_routeButton) show(m_routeButton, !hidden.contains(QStringLiteral("route")));
 }
 
 void NewHome::setArranging(bool on) {
-    if (!on) { delete m_arrange; m_arrange = nullptr; return; }
+    if (!on) { delete m_arrange; m_arrange = nullptr; applyArrangement(); return; }
     if (m_arrange) return;
     auto &settings = *Configs::dataManager->settingsRepo;
     const auto set = [this](QString &field, const QString &value) {
@@ -2418,23 +2460,41 @@ void NewHome::setArranging(bool on) {
         applyArrangement();
     };
     auto *overlay = new ArrangeOverlay(this, [this] { setArranging(false); }, [this] { new ArrangeTutorial(this, {}); });
-    // Where a block is dropped decides its place.
-    overlay->addBlock(m_side, [=, &settings](QPoint at) { set(settings.new_layout_panel, at.x() < width() / 2 ? QStringLiteral("left") : QStringLiteral("right")); });
+    // Where a block is dropped decides its place: the panel by thirds of the window, left, middle or right.
+    overlay->addBlock(m_side, [=, &settings](QPoint at) {
+        set(settings.new_layout_panel, at.x() < width() / 3 ? QStringLiteral("left") : at.x() > width() * 2 / 3 ? QStringLiteral("right") : QStringLiteral("center"));
+    });
+    overlay->addBlock(m_header, [=, &settings](QPoint at) {
+        const QRect panel(mapFromGlobal(m_side->mapToGlobal(QPoint())), m_side->size());
+        set(settings.new_layout_header, at.y() < panel.center().y() ? QStringLiteral("top") : QStringLiteral("bottom"));
+    });
     overlay->addBlock(m_chipBox, [=, &settings](QPoint at) {
         const QRect panel(mapFromGlobal(m_side->mapToGlobal(QPoint())), m_side->size());
         if (!panel.contains(at)) { set(settings.new_layout_chip, QStringLiteral("list")); return; }
         const QRect controls(mapFromGlobal(m_controls->mapToGlobal(QPoint())), m_controls->size());
         set(settings.new_layout_chip, at.y() < controls.center().y() ? QStringLiteral("top") : QStringLiteral("bottom"));
     });
+    // The connect button with TUN and the system proxy is one block: it moves and resizes, nothing in it is taken away.
     overlay->addBlock(m_controls, [=, &settings](QPoint at) {
         const QRect panel(mapFromGlobal(m_side->mapToGlobal(QPoint())), m_side->size());
         set(settings.new_layout_controls, at.y() < panel.center().y() ? QStringLiteral("top") : QStringLiteral("bottom"));
     });
+    // Takes the routing button away or brings it back.
+    const auto toggle = [=, &settings](const QString &part) {
+        auto hidden = settings.new_layout_hidden.split(',', Qt::SkipEmptyParts);
+        if (hidden.contains(part)) hidden.removeAll(part); else hidden << part;
+        set(settings.new_layout_hidden, hidden.join(','));
+    };
     overlay->rebuild = [=, &settings] {
         overlay->clearButtons();
+        const auto hidden = settings.new_layout_hidden.split(',', Qt::SkipEmptyParts);
         const bool compact = settings.new_layout_size == QLatin1String("compact");
         overlay->addButton(m_orb, compact ? QStringLiteral("⤢") : QStringLiteral("⤡"), T("Change size"),
                            [=, &settings] { set(settings.new_layout_size, compact ? QStringLiteral("normal") : QStringLiteral("compact")); });
+        if (m_routeButton) {
+            const bool gone = hidden.contains(QStringLiteral("route"));
+            overlay->addButton(m_routeButton, gone ? QStringLiteral("+") : QStringLiteral("−"), gone ? T("Bring back") : T("Take away"), [=] { toggle(QStringLiteral("route")); });
+        }
     };
     overlay->rebuild();
     overlay->setGeometry(rect());
@@ -2445,6 +2505,11 @@ void NewHome::setArranging(bool on) {
         Configs::dataManager->settingsRepo->new_layout_tutorial = QStringLiteral("seen");
         Configs::dataManager->settingsRepo->Save();
     });
+}
+
+void NewHome::resizeEvent(QResizeEvent *event) {
+    QWidget::resizeEvent(event);
+    updateCentering();
 }
 
 void NewHome::paintEvent(QPaintEvent *) {

@@ -16805,6 +16805,14 @@ Remove that endpoint from this routing profile as well?</source>
 <context>
     <name>NewHome</name>
     <message>
+        <source>Take away</source>
+        <translation>Убрать</translation>
+    </message>
+    <message>
+        <source>Bring back</source>
+        <translation>Вернуть</translation>
+    </message>
+    <message>
         <source>Routing of the provider's Xray config</source>
         <translation>Маршрутизация Xray-конфига провайдера</translation>
     </message>

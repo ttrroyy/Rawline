@@ -375,14 +375,18 @@ namespace Configs {
         int qwdtt_auto_hash_count = 1;
         bool vk_relay_linked = false;
         // Modes a new relay profile takes when its link names none; the originals' defaults.
-        // Where the new interface puts its blocks: the panel (left/right), the subscription card (top/bottom/list)
-        // and the connect button with its switches (top/bottom).
+        // Where the new interface puts its blocks: the panel (left/right, or "center": one narrow column as on the
+        // phone, the servers under it), the subscription card (top/bottom/list), the connect button with its switches
+        // (top/bottom) and the header with the menu and settings (top/bottom of the panel).
         QString new_layout_panel = "left";
+        QString new_layout_header = "top";
         QString new_layout_chip = "top";
         QString new_layout_controls = "top";
         // A smaller connect button ("compact") and the arranging tutorial seen ("seen").
         QString new_layout_size = "normal";
         QString new_layout_tutorial;
+        // The parts taken away in arranging, comma-separated: "route" (the routing button beside the subscription).
+        QString new_layout_hidden;
         // Comma-separated ids of the profiles shown first in their group.
         QString pinned_profiles;
         QString relay_default_qwdtt_mode = "wg";
