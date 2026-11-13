@@ -375,11 +375,9 @@ namespace Configs {
         int qwdtt_auto_hash_count = 1;
         bool vk_relay_linked = false;
         // Modes a new relay profile takes when its link names none; the originals' defaults.
-        // Where the new interface puts its blocks: the panel (left/right, or "center": one narrow column as on the
-        // phone, the servers under it), the subscription card (top/bottom/list), the connect button with its switches
-        // (top/bottom) and the header with the menu and settings (top/bottom of the panel).
+        // Where the new interface puts its panel, one whole block: left or right of the servers, or "center", above
+        // them in one narrow column as on the phone. The card and controls keys are kept from earlier arranging only.
         QString new_layout_panel = "left";
-        QString new_layout_header = "top";
         QString new_layout_chip = "top";
         QString new_layout_controls = "top";
         // A smaller connect button ("compact") and the arranging tutorial seen ("seen").

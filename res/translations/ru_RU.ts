@@ -17039,16 +17039,16 @@ connection</source>
         <translation>Сменить размер</translation>
     </message>
     <message>
-        <source>Drag a block to move it</source>
-        <translation>Перетащите блок, чтобы переместить</translation>
+        <source>Drag the panel to the other side</source>
+        <translation>Перетащите панель на другую сторону</translation>
     </message>
     <message>
         <source>Buttons on a block change its size</source>
         <translation>Кнопки на блоке меняют его размер</translation>
     </message>
     <message>
-        <source>The subscription card goes up, down or over the list</source>
-        <translation>Карточку подписки можно поставить сверху, снизу или над списком</translation>
+        <source>In the middle the servers go under the panel</source>
+        <translation>По центру серверы встают под панель</translation>
     </message>
 </context>
 <context>

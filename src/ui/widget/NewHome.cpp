@@ -2299,23 +2299,38 @@ namespace {
             const auto span = [t](qreal a, qreal b) { return std::clamp((t - a) / (b - a), 0.0, 1.0); };
             const auto ease = [](qreal x) { return x * x * (3 - 2 * x); };
             const QRectF demo(width() / 2.0 - 220, height() / 2.0 - 190, 440, 280);
+            QPointF cursor;
+            qreal press = 0;
             p.setPen(Qt::NoPen);
             p.setBrush(NewStyle::light() ? QColor(250, 250, 252) : QColor(28, 28, 32));
             p.drawRoundedRect(demo, 18, 18);
             const QColor surface = NewStyle::light() ? QColor(0, 0, 0, 18) : QColor(255, 255, 255, 22);
             const QColor accent(80, 140, 255);
             QRectF panel(demo.left() + 16, demo.top() + 16, 150, demo.height() - 32);
-            const QRectF list(demo.left() + 182, demo.top() + 16, demo.width() - 198, demo.height() - 32);
-            for (int i = 0; i < 6; ++i) { p.setBrush(surface); p.drawRoundedRect(QRectF(list.left(), list.top() + i * 42, list.width(), 34), 9, 9); }
-            QPointF cursor;
-            qreal press = 0;
-            if (m_step == 0) {
-                // The panel taken to the other side.
+            QRectF list(demo.left() + 182, demo.top() + 16, demo.width() - 198, demo.height() - 32);
+            if (m_step == 2) {
+                // The panel taken to the middle: it keeps only its own height and the servers go under it.
                 const qreal move = ease(span(.25, .7));
-                panel.moveLeft(panel.left() + (list.right() - 150 - (demo.left() + 16)) * move);
+                const qreal left = demo.left() + 16 + (demo.center().x() - 75 - demo.left() - 16) * move;
+                panel = QRectF(left, demo.top() + 16, 150, (demo.height() - 32) - 60 * move);
+                const QRectF under(demo.center().x() - 120, panel.bottom() + 12, 240, demo.bottom() - 16 - panel.bottom() - 12);
+                list = QRectF(list.left() + (under.left() - list.left()) * move, list.top() + (under.top() - list.top()) * move,
+                              list.width() + (under.width() - list.width()) * move, list.height() + (under.height() - list.height()) * move);
+                cursor = panel.center() + QPointF(0, -30);
+                press = span(.15, .25) * (1 - span(.75, .85));
+            }
+            if (m_step == 0) {
+                // The panel taken to the other side, the servers moving over to where it stood.
+                const qreal move = ease(span(.25, .7));
+                panel.moveLeft(demo.left() + 16 + (demo.width() - 32 - 150) * move);
+                list.moveLeft(demo.left() + 182 - 166 * move);
                 cursor = panel.center() + QPointF(0, -40);
                 press = span(.15, .25) * (1 - span(.75, .85));
-            } else if (m_step == 1) {
+            }
+            p.save(); p.setClipRect(list);
+            for (int i = 0; i < 6; ++i) { p.setBrush(surface); p.drawRoundedRect(QRectF(list.left(), list.top() + i * 42, list.width(), 34), 9, 9); }
+            p.restore();
+            if (m_step == 1) {
                 cursor = QPointF(panel.right() - 4, panel.top() + 6);
             }
             p.setBrush(surface);
@@ -2337,17 +2352,6 @@ namespace {
                 p.setBrush(accent);
                 p.drawEllipse(QPointF(panel.right() - 4, panel.top() + 6), 11, 11);
                 press = span(.38, .45) * (1 - span(.45, .52));
-            }
-            if (m_step == 2) {
-                // The subscription card carried from the panel's bottom over the server list.
-                const qreal move = ease(span(.25, .7));
-                const QRectF from(panel.left() + 10, panel.bottom() - 40, panel.width() - 20, 30), to(list.left(), list.top() - 4, list.width(), 30);
-                const QRectF card(from.left() + (to.left() - from.left()) * move, from.top() + (to.top() - from.top()) * move,
-                                  from.width() + (to.width() - from.width()) * move, 30);
-                p.setBrush(accent);
-                p.drawRoundedRect(card, 9, 9);
-                cursor = card.center();
-                press = span(.15, .25) * (1 - span(.75, .85));
             }
             // The cursor: a filled arrow with a ring while it presses.
             p.setBrush(QColor(255, 255, 255, int(90 * press)));
@@ -2381,9 +2385,9 @@ namespace {
         }
     private:
         void updateText() {
-            static const char *lines[] = {QT_TRANSLATE_NOOP("NewHome", "Drag a block to move it"),
+            static const char *lines[] = {QT_TRANSLATE_NOOP("NewHome", "Drag the panel to the other side"),
                                           QT_TRANSLATE_NOOP("NewHome", "Buttons on a block change its size"),
-                                          QT_TRANSLATE_NOOP("NewHome", "The subscription card goes up, down or over the list")};
+                                          QT_TRANSLATE_NOOP("NewHome", "In the middle the servers go under the panel")};
             m_text = QCoreApplication::translate("NewHome", lines[m_step]);
             m_next->setText(QCoreApplication::translate("NewHome", m_step == 2 ? "Done" : "Next"));
         }
@@ -2407,34 +2411,24 @@ void NewHome::applyArrangement() {
     // Left or right of the servers, or above them in one narrow column as on the phone.
     const bool centered = settings.new_layout_panel == QLatin1String("center");
     m_columns->setDirection(centered ? QBoxLayout::TopToBottom : QBoxLayout::LeftToRight);
+    // The panel is one whole block, 300 px wide wherever it stands; centered, it sits over the servers.
     m_columns->removeWidget(m_side);
-    m_columns->insertWidget(settings.new_layout_panel == QLatin1String("right") ? 1 : 0, m_side, 0);
-    if (centered) { m_side->setMinimumWidth(0); m_side->setMaximumWidth(QWIDGETSIZE_MAX); }
-    else m_side->setFixedWidth(300);
+    m_columns->insertWidget(settings.new_layout_panel == QLatin1String("right") ? 1 : 0, m_side, 0, centered ? Qt::AlignHCenter : Qt::Alignment());
+    m_side->setFixedWidth(300);
     updateCentering();
-    // The panel's order: header on top, card on top, the connect block, room, card at the bottom, header at the
-    // bottom, the status lines.
+    // Inside it the order never changes: header, card, the connect block, room, the status lines.
     m_sideLayout->removeWidget(m_header);
     m_sideLayout->removeWidget(m_chipBox);
     m_bodyLayout->removeWidget(m_chipBox);
     m_sideLayout->removeWidget(m_controls);
     for (int i = m_sideLayout->count() - 1; i >= 0; --i) if (m_sideLayout->itemAt(i)->spacerItem()) delete m_sideLayout->takeAt(i);
     int at = 0;
-    const bool headerBottom = settings.new_layout_header == QLatin1String("bottom");
-    if (!headerBottom) m_sideLayout->insertWidget(at++, m_header);
-    const QString chip = settings.new_layout_chip;
-    if (chip == QLatin1String("top")) m_sideLayout->insertWidget(at++, m_chipBox);
-    if (settings.new_layout_controls == QLatin1String("bottom")) {
-        m_sideLayout->insertStretch(at++, 1);
-        m_sideLayout->insertWidget(at++, m_controls);
-    } else {
-        m_sideLayout->insertWidget(at++, m_controls);
-        m_sideLayout->insertStretch(at++, 1);
-    }
-    if (chip == QLatin1String("bottom")) m_sideLayout->insertWidget(at++, m_chipBox);
-    if (headerBottom) m_sideLayout->insertWidget(at++, m_header);
-    if (chip == QLatin1String("list")) m_bodyLayout->insertWidget(0, m_chipBox);
-    m_chipBox->layout()->setContentsMargins(0, chip == QLatin1String("list") ? 0 : 14, 0, chip == QLatin1String("list") ? 10 : 0);
+    m_sideLayout->insertWidget(at++, m_header);
+    m_sideLayout->insertWidget(at++, m_chipBox);
+    m_sideLayout->insertWidget(at++, m_controls);
+    // Beside the servers the room takes the panel's height; centered, the panel keeps only what it needs.
+    if (!centered) m_sideLayout->insertStretch(at++, 1);
+    m_chipBox->layout()->setContentsMargins(0, 14, 0, 0);
     m_chipBox->show();
     m_orb->setFixedHeight(settings.new_layout_size == QLatin1String("compact") ? 148 : 190);
     // Taken away, a part is gone from the window; while arranging it stays faded, with a plus to bring it back.
@@ -2460,24 +2454,10 @@ void NewHome::setArranging(bool on) {
         applyArrangement();
     };
     auto *overlay = new ArrangeOverlay(this, [this] { setArranging(false); }, [this] { new ArrangeTutorial(this, {}); });
-    // Where a block is dropped decides its place: the panel by thirds of the window, left, middle or right.
+    // The panel is the one block: dropped in the left, middle or right third of the window, it stands there and
+    // the servers and tabs take the rest. The connect button only changes size; the routing button can go.
     overlay->addBlock(m_side, [=, &settings](QPoint at) {
         set(settings.new_layout_panel, at.x() < width() / 3 ? QStringLiteral("left") : at.x() > width() * 2 / 3 ? QStringLiteral("right") : QStringLiteral("center"));
-    });
-    overlay->addBlock(m_header, [=, &settings](QPoint at) {
-        const QRect panel(mapFromGlobal(m_side->mapToGlobal(QPoint())), m_side->size());
-        set(settings.new_layout_header, at.y() < panel.center().y() ? QStringLiteral("top") : QStringLiteral("bottom"));
-    });
-    overlay->addBlock(m_chipBox, [=, &settings](QPoint at) {
-        const QRect panel(mapFromGlobal(m_side->mapToGlobal(QPoint())), m_side->size());
-        if (!panel.contains(at)) { set(settings.new_layout_chip, QStringLiteral("list")); return; }
-        const QRect controls(mapFromGlobal(m_controls->mapToGlobal(QPoint())), m_controls->size());
-        set(settings.new_layout_chip, at.y() < controls.center().y() ? QStringLiteral("top") : QStringLiteral("bottom"));
-    });
-    // The connect button with TUN and the system proxy is one block: it moves and resizes, nothing in it is taken away.
-    overlay->addBlock(m_controls, [=, &settings](QPoint at) {
-        const QRect panel(mapFromGlobal(m_side->mapToGlobal(QPoint())), m_side->size());
-        set(settings.new_layout_controls, at.y() < panel.center().y() ? QStringLiteral("top") : QStringLiteral("bottom"));
     });
     // Takes the routing button away or brings it back.
     const auto toggle = [=, &settings](const QString &part) {
