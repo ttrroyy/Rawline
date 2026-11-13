@@ -24,6 +24,7 @@
 #include <QMenu>
 #include <QMessageBox>
 #include <QPlainTextEdit>
+#include <QHash>
 #include <QPointer>
 #include <QProgressBar>
 #include <QPushButton>
@@ -202,7 +203,7 @@ class PanelDeploy : public QDialog {
             "Сертификат Let's Encrypt выпускается на этот домен, поэтому он должен уже указывать на VPS.",
             "DNS-туннели работают через делегированную зону, которую обслуживает этот VPS.",
             "Скрипт панели проверяет VPS, ничего не меняя: порты, сетевые права, подсети, прокси, DNS-записи и место на диске.",
-            "Сборка ядер на VPS занимает от 5 до 40 минут в зависимости от процессора. Окно можно не держать открытым на переднем плане.",
+            "Окно можно закрыть: установка продолжится, пока Rawline работает, и откроется снова с этим VPS. Остановить её можно только кнопкой «Остановить».",
             QString()};
         if (pages->currentIndex() != index && pages->currentIndex() != Progress) history.append(pages->currentIndex());
         pages->setCurrentIndex(index);
@@ -856,13 +857,12 @@ class PanelDeploy : public QDialog {
     }
 
   protected:
+    // Closing does not stop an operation: the window only hides and opens again with this VPS; «Остановить» stops it.
     void closeEvent(QCloseEvent *event) override {
         if (task->running()) {
-            if (QMessageBox::question(this, "Операция выполняется", "Остановить операцию на VPS? Уже выполненные изменения сохранятся.") != QMessageBox::Yes) {
-                event->ignore();
-                return;
-            }
-            task->cancel();
+            event->ignore();
+            hide();
+            return;
         }
         QDialog::closeEvent(event);
     }
@@ -923,8 +923,18 @@ QJsonObject NewPanelServer() {
 }
 
 QDialog *OpenPanelDeploy(QWidget *parent, const QJsonObject &server, const std::function<void(const QJsonObject &)> &save) {
-    auto *dialog = new PanelDeploy(server, save, parent);
+    // One window per VPS: a hidden one still running its install comes back as it is.
+    static QHash<QString, QPointer<QDialog>> open;
+    const auto id = server.value("id").toString();
+    if (auto existing = open.value(id)) {
+        existing->show(); existing->raise(); existing->activateWindow();
+        return existing;
+    }
+    // Without a parent, so closing the settings that opened it does not end an install hidden behind it.
+    Q_UNUSED(parent)
+    auto *dialog = new PanelDeploy(server, save, nullptr);
     dialog->setAttribute(Qt::WA_DeleteOnClose);
+    if (!id.isEmpty()) open.insert(id, dialog);
     dialog->show();
     return dialog;
 }

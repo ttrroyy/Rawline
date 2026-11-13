@@ -605,6 +605,8 @@ bool SaveVKRelayPreviews(const QString &directory) {
         for (auto *edit : dialog->findChildren<QLineEdit *>())
             if (edit->text() == "secret-password" && edit->isVisible()) hidden = edit->echoMode() == QLineEdit::Password;
         if (!hidden) return false;
+        // One window per VPS: opening it again brings back the same one, so a hidden install is found again.
+        if (OpenPanelDeploy(nullptr, installed, save) != dialog.data()) return false;
         dialog->close();
         if (dialog) delete dialog;
     }
