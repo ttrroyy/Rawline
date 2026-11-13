@@ -231,7 +231,7 @@ class PanelDeploy : public QDialog {
         back->setVisible(index != Server && !(index == Progress));
         back->setEnabled(!busy && !history.isEmpty());
         next->setVisible(index != Server && index != Progress);
-        next->setText(index != Check ? QStringLiteral("Далее") : goal == "reinstall" ? QStringLiteral("Установить заново") : QStringLiteral("Установить"));
+        next->setText(index != Check ? QStringLiteral("Далее") : goal == "reinstall" ? QStringLiteral("Установить / Обновить") : QStringLiteral("Установить"));
         next->setEnabled(!busy && (index != Check || checkPassed));
         stop->setEnabled(busy);
         recheck->setEnabled(!busy);
@@ -809,7 +809,7 @@ class PanelDeploy : public QDialog {
         }
         if (!role.isEmpty()) {
             // Updating is installing again with what is installed: users and settings stay.
-            auto *again = new QPushButton("Установить заново (обновить)", serverBody);
+            auto *again = new QPushButton("Установить / Обновить", serverBody);
             again->setToolTip("Переустановит с теми же параметрами: компоненты, протоколы, доступ и домен. Пользователи, подписки и настройки панели сохранятся.");
             connect(again, &QPushButton::clicked, this, [this] { reinstall(); });
             actions->addWidget(again);
