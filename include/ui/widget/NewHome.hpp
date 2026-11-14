@@ -28,10 +28,15 @@ namespace NewStyle {
     // Theme keys kept in settings; anything else is the classic interface.
     inline constexpr auto OledTheme = "NewOLED";
     inline constexpr auto WhiteTheme = "NewWhite";
+    // The same screen in the mobile app's Pastel palette: plum, with a lilac accent.
+    inline constexpr auto PastelTheme = "NewPastel";
     bool isTheme(const QString &theme);
     void setTheme(const QString &theme);
     bool active();
     bool light();
+    bool pastel();
+    // Switches, links and the chosen row: the text colour, or lilac in Pastel.
+    QColor accent();
 
     QColor background();
     QColor text();

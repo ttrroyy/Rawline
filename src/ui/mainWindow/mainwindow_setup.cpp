@@ -50,7 +50,6 @@
 #include "include/ui/widget/LiveChart.h"
 #include "include/ui/widget/StartStopButton.hpp"
 #include "include/ui/widget/NewHome.hpp"
-#include "include/ui/widget/MikanHome.hpp"
 
 #include "include/configs/generate.h"
 #include "include/database/GroupsRepo.h"
@@ -94,7 +93,6 @@ MainWindow *UI_InitMainWindow() {
 
 static bool themeUsesDarkLog(const QString &theme) {
     if (NewStyle::isTheme(theme)) return !NewStyle::light();
-    if (Mikan::isTheme(theme)) return !Mikan::light();
     const auto lower = theme.toLower();
     if (lower.contains("vista") || lower.contains("flatgray") || lower.contains("lightblue") || lower.contains("softpink")) {
         return false;
@@ -208,6 +206,11 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWi
     Configs::dataManager->settingsRepo->theme.toInt(&isNum);
     if (isNum) {
         Configs::dataManager->settingsRepo->theme = "System";
+    }
+    // The Pastel test themes of a dev build became one palette of the Rawline screen.
+    if (Configs::dataManager->settingsRepo->theme.startsWith(QStringLiteral("Mikan"))) {
+        Configs::dataManager->settingsRepo->theme = QString::fromLatin1(NewStyle::PastelTheme);
+        Configs::dataManager->settingsRepo->Save();
     }
     themeManager()->ApplyTheme(Configs::dataManager->settingsRepo->theme);
     ui->setupUi(this);

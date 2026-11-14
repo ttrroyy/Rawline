@@ -756,19 +756,6 @@
        <string>Style</string>
       </attribute>
       <layout class="QGridLayout" name="gridLayout_5">
-       <item row="4" column="0">
-        <spacer name="style_bottom_spacer">
-         <property name="orientation">
-          <enum>Qt::Orientation::Vertical</enum>
-         </property>
-         <property name="sizeHint" stdset="0">
-          <size>
-           <width>20</width>
-           <height>0</height>
-          </size>
-         </property>
-        </spacer>
-       </item>
        <item row="2" column="0">
         <layout class="QHBoxLayout" name="style_h_2">
          <item>
@@ -886,12 +873,6 @@
         <layout class="QHBoxLayout" name="style_h_3">
          <item>
           <widget class="QGroupBox" name="horizontalGroupBox_5">
-           <property name="sizePolicy">
-            <sizepolicy hsizetype="Preferred" vsizetype="Maximum">
-             <horstretch>0</horstretch>
-             <verstretch>0</verstretch>
-            </sizepolicy>
-           </property>
            <layout class="QVBoxLayout" name="verticalLayout_5">
             <item>
              <widget class="QCheckBox" name="start_minimal">
@@ -927,12 +908,6 @@
          </item>
          <item>
           <widget class="QGroupBox" name="groupBox_2">
-           <property name="sizePolicy">
-            <sizepolicy hsizetype="Preferred" vsizetype="Maximum">
-             <horstretch>0</horstretch>
-             <verstretch>0</verstretch>
-            </sizepolicy>
-           </property>
            <layout class="QHBoxLayout" name="horizontalLayout_23">
             <item>
              <widget class="QCheckBox" name="skip_delete_confirm">
@@ -973,40 +948,7 @@
               </item>
              </widget>
             </item>
-            <item row="1" column="0">
-             <widget class="QLabel" name="label_accent">
-              <property name="sizePolicy">
-               <sizepolicy hsizetype="Maximum" vsizetype="Maximum">
-                <horstretch>0</horstretch>
-                <verstretch>0</verstretch>
-               </sizepolicy>
-              </property>
-              <property name="text">
-               <string>Accent</string>
-              </property>
-             </widget>
-            </item>
-            <item row="1" column="1">
-             <widget class="QComboBox" name="accent">
-              <property name="toolTip">
-               <string>Color of switches, links and highlights in the Pastel theme. Light themes use the deeper shade, dark themes the brighter one.</string>
-              </property>
-             </widget>
-            </item>
-            <item row="0" column="2">
-             <spacer name="theme_field_spacer">
-              <property name="orientation">
-               <enum>Qt::Orientation::Horizontal</enum>
-              </property>
-              <property name="sizeHint" stdset="0">
-               <size>
-                <width>0</width>
-                <height>20</height>
-               </size>
-              </property>
-             </spacer>
-            </item>
-            <item row="3" column="1">
+            <item row="2" column="1">
              <widget class="QPushButton" name="select_custom_icon">
               <property name="uiLevel" stdset="0">
                <string notr="true">advanced</string>
@@ -1016,7 +958,7 @@
               </property>
              </widget>
             </item>
-            <item row="3" column="0">
+            <item row="2" column="0">
              <widget class="QCheckBox" name="enable_custom_icon">
               <property name="uiLevel" stdset="0">
                <string notr="true">advanced</string>
@@ -1026,14 +968,8 @@
               </property>
              </widget>
             </item>
-            <item row="4" column="0" colspan="2">
+            <item row="3" column="0">
              <widget class="QCheckBox" name="follow_status_in_taskbar">
-              <property name="sizePolicy">
-               <sizepolicy hsizetype="Ignored" vsizetype="Fixed">
-                <horstretch>0</horstretch>
-                <verstretch>0</verstretch>
-               </sizepolicy>
-              </property>
               <property name="uiLevel" stdset="0">
                <string notr="true">advanced</string>
               </property>
@@ -1045,12 +981,12 @@
               </property>
              </widget>
             </item>
-           <item row="2" column="0">
+           <item row="1" column="0">
  <widget class="QLabel" name="label_seasonal_decoration">
   <property name="text"><string>Seasonal decoration</string></property>
  </widget>
 </item>
-<item row="2" column="1">
+<item row="1" column="1">
  <widget class="QComboBox" name="seasonal_decoration"/>
 </item>
 </layout>
