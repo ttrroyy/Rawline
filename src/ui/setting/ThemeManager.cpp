@@ -23,6 +23,7 @@
 
 #include "include/ui/setting/ThemeManager.hpp"
 #include "include/ui/widget/NewHome.hpp"
+#include "include/ui/widget/MikanHome.hpp"
 #include "include/global/Configs.hpp"
 
 #include <QGlobalStatic>
@@ -367,32 +368,53 @@ void ThemeManager::ApplyTheme(const QString &theme, bool force) {
 
     const auto lowerTheme = theme.toLower();
     const auto &themes = customThemes();
+    const bool leavingMikan = Mikan::isTheme(current_theme);
+    const bool enteringMikan = Mikan::isTheme(theme);
     const bool leavingNew = NewStyle::isTheme(current_theme);
     const bool enteringNew = NewStyle::isTheme(theme);
-    const bool leavingCustom = themes.contains(current_theme.toLower()) || leavingNew;
+    const bool leavingCustom = themes.contains(current_theme.toLower()) || leavingNew || leavingMikan;
     const bool enteringCustom = themes.contains(lowerTheme);
     const ThemeColors colors = themes.value(lowerTheme);
-    const QColor newGround = leavingNew ? NewStyle::background() : QColor();
-    NewStyle::setTheme(theme);
+    const QColor newGround = leavingMikan ? Mikan::background() : leavingNew ? NewStyle::background() : QColor();
+    // The screen being left restores its menus before the one being entered prepares its own.
+    if (enteringMikan) {
+        NewStyle::setTheme(theme);
+        Mikan::setTheme(theme);
+    } else {
+        Mikan::setTheme(theme);
+        NewStyle::setTheme(theme);
+    }
 
     QString themeSheet;
     bool windows11Tabs = false;
     bool macosPane = false;
 
-    if (enteringNew) {
+    if (enteringMikan) {
+        // The Mikan interface draws itself; Fusion follows its palette and sheet everywhere else.
+        qApp->setStyleSheet("");
+        qApp->setStyle(Mikan::createStyle());
+        qApp->setPalette(Mikan::palette());
+        themeSheet = Mikan::styleSheet();
+        if (!leavingNew && !leavingMikan) system_font_family = qApp->font().family();
+        if (Configs::dataManager->settingsRepo->font.isEmpty()) {
+            auto font = qApp->font();
+            font.setFamily(Mikan::fontFamily());
+            qApp->setFont(font);
+        }
+    } else if (enteringNew) {
         // The new interface draws itself; Fusion follows its palette and sheet everywhere else.
         qApp->setStyleSheet("");
         qApp->setStyle(NewStyle::createStyle());
         qApp->setPalette(NewStyle::palette());
         themeSheet = NewStyle::styleSheet();
-        if (!leavingNew) system_font_family = qApp->font().family();
+        if (!leavingNew && !leavingMikan) system_font_family = qApp->font().family();
         if (Configs::dataManager->settingsRepo->font.isEmpty()) {
             auto font = qApp->font();
             font.setFamily(NewStyle::fontFamily());
             qApp->setFont(font);
         }
     } else if (enteringCustom) {
-        if (leavingNew) {
+        if (leavingNew || leavingMikan) {
             qApp->setStyleSheet("");
             qApp->setStyle(system_style_name);
         }
@@ -418,7 +440,7 @@ void ThemeManager::ApplyTheme(const QString &theme, bool force) {
         const QString styleName = lowerTheme == "system" ? system_style_name : theme;
         qApp->setStyle(styleName);
         // The new look's ground must not outlive it: if the palette did not come back, the saved one goes on whole.
-        if (leavingNew && qApp->palette().color(QPalette::Active, QPalette::Window) == newGround &&
+        if ((leavingNew || leavingMikan) && qApp->palette().color(QPalette::Active, QPalette::Window) == newGround &&
             system_palette.color(QPalette::Active, QPalette::Window) != newGround) {
             QPalette whole = system_palette;
             whole.setResolveMask(~QPalette::ResolveMask(0));
@@ -428,7 +450,7 @@ void ThemeManager::ApplyTheme(const QString &theme, bool force) {
         macosPane = styleName.compare(QStringLiteral("macos"), Qt::CaseInsensitive) == 0;
     }
 
-    if (leavingNew && !enteringNew && !system_font_family.isEmpty() && Configs::dataManager->settingsRepo->font.isEmpty()) {
+    if ((leavingNew || leavingMikan) && !enteringNew && !enteringMikan && !system_font_family.isEmpty() && Configs::dataManager->settingsRepo->font.isEmpty()) {
         auto font = qApp->font();
         font.setFamily(system_font_family);
         qApp->setFont(font);
@@ -465,7 +487,8 @@ void ThemeManager::ApplyTheme(const QString &theme, bool force) {
 
     // Leaving the new look also re-creates the window without its own frame; applying the classic theme once more
     // after that, on a settled window, gives it exactly the state a start with this theme gives.
-    if (leavingNew && !enteringNew) {
+    // Mikan puts the caption back itself and applies the settled theme from there.
+    if (leavingNew && !enteringNew && !enteringMikan) {
         QTimer::singleShot(0, this, [this, theme] { if (current_theme == theme) ApplyTheme(theme, true); });
     }
 }

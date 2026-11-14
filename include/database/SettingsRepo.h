@@ -113,6 +113,8 @@ namespace Configs {
         int quic_initial_packet_size = 0;
         bool quic_disable_path_mtu_discovery = false;
         QString theme = "NewOLED";
+        // Mikan accent id: violet, blue, teal, rose, amber. Light and dark themes each use their own shade.
+        QString accent = "violet";
         QString seasonal_decoration = "auto";
         bool seasonal_auto_13_migrated = false;
         bool dns_optimistic_164_migrated = false;

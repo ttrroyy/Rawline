@@ -435,6 +435,14 @@ It stays a preference, not a lock: if that profile stops working the selector st
         <translation>Rawline White</translation>
     </message>
     <message>
+        <source>Pastel by ad0y3z, dark</source>
+        <translation>Pastel by ad0y3z, тёмная</translation>
+    </message>
+    <message>
+        <source>Pastel by ad0y3z, light</source>
+        <translation>Pastel by ad0y3z, светлая</translation>
+    </message>
+    <message>
         <source>Basic Settings</source>
         <translation>Основные настройки</translation>
     </message>
@@ -485,6 +493,54 @@ It stays a preference, not a lock: if that profile stops working the selector st
     <message>
         <source>Theme</source>
         <translation>Тема</translation>
+    </message>
+    <message>
+        <source>Accent</source>
+        <translation>Акцент</translation>
+    </message>
+    <message>
+        <source>Color of switches, links and highlights in the Pastel theme. Light themes use the deeper shade, dark themes the brighter one.</source>
+        <translation>Цвет переключателей, ссылок и подсветок в теме Pastel. В светлых темах оттенок темнее, в тёмных — ярче.</translation>
+    </message>
+    <message>
+        <source>Violet</source>
+        <translation>Фиолетовый</translation>
+    </message>
+    <message>
+        <source>Indigo</source>
+        <translation>Индиго</translation>
+    </message>
+    <message>
+        <source>Blue</source>
+        <translation>Синий</translation>
+    </message>
+    <message>
+        <source>Cyan</source>
+        <translation>Голубой</translation>
+    </message>
+    <message>
+        <source>Teal</source>
+        <translation>Бирюзовый</translation>
+    </message>
+    <message>
+        <source>Green</source>
+        <translation>Зелёный</translation>
+    </message>
+    <message>
+        <source>Amber</source>
+        <translation>Янтарный</translation>
+    </message>
+    <message>
+        <source>Orange</source>
+        <translation>Оранжевый</translation>
+    </message>
+    <message>
+        <source>Rose</source>
+        <translation>Розовый</translation>
+    </message>
+    <message>
+        <source>Red</source>
+        <translation>Красный</translation>
     </message>
     <message>
         <source>Connection statistics</source>
@@ -17053,6 +17109,311 @@ connection</source>
     <message>
         <source>In the middle the servers go under the panel</source>
         <translation>По центру серверы встают под панель</translation>
+    </message>
+</context>
+<context>
+    <name>MikanHome</name>
+    <message>
+        <source>Arrange the window</source>
+        <translation>Изменить расположение</translation>
+    </message>
+    <message>
+        <source>Done</source>
+        <translation>Готово</translation>
+    </message>
+    <message>
+        <source>Click to connect</source>
+        <translation>Нажмите для подключения</translation>
+    </message>
+    <message>
+        <source>Minimize</source>
+        <translation>Свернуть</translation>
+    </message>
+    <message>
+        <source>Maximize</source>
+        <translation>Развернуть</translation>
+    </message>
+    <message>
+        <source>Close</source>
+        <translation>Закрыть</translation>
+    </message>
+    <message>
+        <source>Menu</source>
+        <translation>Меню</translation>
+    </message>
+    <message>
+        <source>Settings</source>
+        <translation>Настройки</translation>
+    </message>
+    <message>
+        <source>Add</source>
+        <translation>Добавить</translation>
+    </message>
+    <message>
+        <source>Check current
+connection</source>
+        <translation>Проверить текущее
+подключение</translation>
+    </message>
+    <message>
+        <source>TUN mode</source>
+        <translation>Режим TUN</translation>
+    </message>
+    <message>
+        <source>System proxy</source>
+        <translation>Системный прокси</translation>
+    </message>
+    <message>
+        <source>Servers</source>
+        <translation>Серверы</translation>
+    </message>
+    <message>
+        <source>Update subscription</source>
+        <translation>Обновить подписку</translation>
+    </message>
+    <message>
+        <source>Ping test</source>
+        <translation>Проверка пинга</translation>
+    </message>
+    <message>
+        <source>Speed test</source>
+        <translation>Тест скорости</translation>
+    </message>
+    <message>
+        <source>More</source>
+        <translation>Ещё</translation>
+    </message>
+    <message>
+        <source>Subscription page</source>
+        <translation>Страница подписки</translation>
+    </message>
+    <message>
+        <source>Support</source>
+        <translation>Поддержка</translation>
+    </message>
+    <message>
+        <source>Search by name</source>
+        <translation>Поиск по имени</translation>
+    </message>
+    <message>
+        <source>Clipboard</source>
+        <translation>Буфер обмена</translation>
+    </message>
+    <message>
+        <source>QR code</source>
+        <translation>QR-код</translation>
+    </message>
+    <message>
+        <source>Traffic not provided</source>
+        <translation>Трафик не указан</translation>
+    </message>
+    <message>
+        <source>Expiry: %1</source>
+        <translation>Срок действия: %1</translation>
+    </message>
+    <message>
+        <source>To use the app, add a proxy server and/or subscription to the server list.</source>
+        <translation>Чтобы использовать приложение, вам необходимо добавить прокси-сервер и/или подписку в список серверов.</translation>
+    </message>
+    <message>
+        <source>This group has no servers yet.</source>
+        <translation>В этой группе пока нет серверов.</translation>
+    </message>
+    <message>
+        <source>Connecting…</source>
+        <translation>Подключение…</translation>
+    </message>
+    <message>
+        <source>Stopping…</source>
+        <translation>Выключение…</translation>
+    </message>
+    <message>
+        <source>Connected</source>
+        <translation>Подключено</translation>
+    </message>
+    <message>
+        <source>Success: %1 ms</source>
+        <translation>Успешно: %1 мс</translation>
+    </message>
+    <message>
+        <source>n/a</source>
+        <translation>н/д</translation>
+    </message>
+    <message>
+        <source>Checking ping</source>
+        <translation>Проверка пинга</translation>
+    </message>
+    <message>
+        <source>Group</source>
+        <translation>Группа</translation>
+    </message>
+    <message>
+        <source>Groups</source>
+        <translation>Группы</translation>
+    </message>
+    <message>
+        <source>Subscription</source>
+        <translation>Подписка</translation>
+    </message>
+    <message>
+        <source>Add group or subscription</source>
+        <translation>Добавить группу или подписку</translation>
+    </message>
+    <message>
+        <source>Manage groups and subscriptions</source>
+        <translation>Управление группами и подписками</translation>
+    </message>
+    <message>
+        <source>Service mode</source>
+        <translation>Сервисный режим</translation>
+    </message>
+    <message>
+        <source>Sort</source>
+        <translation>Сортировка</translation>
+    </message>
+    <message>
+        <source>By name</source>
+        <translation>По имени</translation>
+    </message>
+    <message>
+        <source>By type</source>
+        <translation>По типу</translation>
+    </message>
+    <message>
+        <source>By address</source>
+        <translation>По адресу</translation>
+    </message>
+    <message>
+        <source>By latency</source>
+        <translation>По задержке</translation>
+    </message>
+    <message>
+        <source>By test result</source>
+        <translation>По результату теста</translation>
+    </message>
+    <message>
+        <source>By traffic</source>
+        <translation>По трафику</translation>
+    </message>
+    <message>
+        <source>Stop sorting</source>
+        <translation>Не сортировать</translation>
+    </message>
+    <message>
+        <source>Details</source>
+        <translation>Подробнее</translation>
+    </message>
+    <message>
+        <source>Overview</source>
+        <translation>Обзор</translation>
+    </message>
+    <message>
+        <source>Servers, log and traffic</source>
+        <translation>Серверы, журнал и трафик</translation>
+    </message>
+    <message>
+        <source>Profile</source>
+        <translation>Профиль</translation>
+    </message>
+    <message>
+        <source>Route traffic through a virtual adapter</source>
+        <translation>Направлять трафик через виртуальный адаптер</translation>
+    </message>
+    <message>
+        <source>Send system traffic through the proxy</source>
+        <translation>Направлять системный трафик через прокси</translation>
+    </message>
+    <message>
+        <source>Traffic Statistics</source>
+        <translation>Статистика трафика</translation>
+    </message>
+    <message>
+        <source>Connection Info</source>
+        <translation>Сведения о подключении</translation>
+    </message>
+    <message>
+        <source>Server</source>
+        <translation>Сервер</translation>
+    </message>
+    <message>
+        <source>Latency</source>
+        <translation>Задержка</translation>
+    </message>
+    <message>
+        <source>Protocol</source>
+        <translation>Протокол</translation>
+    </message>
+    <message>
+        <source>Transport</source>
+        <translation>Транспорт</translation>
+    </message>
+    <message>
+        <source>Uptime</source>
+        <translation>Время работы</translation>
+    </message>
+    <message>
+        <source>Inbound</source>
+        <translation>Прослушивание</translation>
+    </message>
+    <message>
+        <source>Download</source>
+        <translation>Загрузка</translation>
+    </message>
+    <message>
+        <source>Upload</source>
+        <translation>Отдача</translation>
+    </message>
+    <message>
+        <source>1h</source>
+        <translation>1 ч</translation>
+    </message>
+    <message>
+        <source>24h</source>
+        <translation>24 ч</translation>
+    </message>
+    <message>
+        <source>7d</source>
+        <translation>7 д</translation>
+    </message>
+    <message>
+        <source>via %1</source>
+        <translation>через %1</translation>
+    </message>
+    <message>
+        <source>Check connection</source>
+        <translation>Проверить подключение</translation>
+    </message>
+    <message>
+        <source>Checking…</source>
+        <translation>Проверка…</translation>
+    </message>
+    <message>
+        <source>On</source>
+        <translation>Вкл</translation>
+    </message>
+    <message>
+        <source>Off</source>
+        <translation>Выкл</translation>
+    </message>
+    <message>
+        <source>Local group</source>
+        <translation>Локальная группа</translation>
+    </message>
+    <message>
+        <source>Logs, connections and statistics</source>
+        <translation>Журнал, подключения и статистика</translation>
+    </message>
+    <message>
+        <source>Back</source>
+        <translation>Назад</translation>
+    </message>
+    <message>
+        <source>Subscription settings</source>
+        <translation>Настройки подписки</translation>
+    </message>
+    <message>
+        <source>%1 selected</source>
+        <translation>Выбрано: %1</translation>
     </message>
 </context>
 <context>

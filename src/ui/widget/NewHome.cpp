@@ -1,5 +1,6 @@
 #include "include/ui/widget/NewHome.hpp"
 #include "include/ui/widget/NewIcons.h"
+#include "include/ui/widget/MikanHome.hpp"
 
 #include "include/ui/mainwindow.h"
 #include "include/ui/mainWindow/MainWindowInternal.h"
@@ -2513,6 +2514,10 @@ bool NewHome::eventFilter(QObject *watched, QEvent *event) {
 // ---------------------------------------------------------------- switching interfaces
 
 void MainWindow::applyInterfaceStyle(bool animated) {
+    if (Mikan::active() || (mikanHome && rootStack && rootStack->currentWidget() == mikanHome)) {
+        applyMikanInterfaceStyle(animated);
+        return;
+    }
     const bool wantNew = NewStyle::active();
     QLabel *cover = nullptr;
     // A change of look: the old picture stays on top until the new one is ready, then fades.
