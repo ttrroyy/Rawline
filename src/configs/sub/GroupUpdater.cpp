@@ -992,7 +992,9 @@ namespace Subscription {
         HttpGetOptions options;
         options.maxBytes = kMaxSubscriptionBytes;
         options.userAgent = identity.userAgent;
-        options.headers = identityHeaders(identity);
+        // turnplus.xyz and the like answer a request without Accept (Qt sends none) with their web page.
+        options.headers = {{"Accept", "*/*"}};
+        options.headers += identityHeaders(identity);
         options.tlsProtocol = tlsProtocolOf(identity.tlsVersion);
         options.http2 = identity.httpVersion != Configs::subHttpVersion::http11;
         const auto target = UnwrapProviderLink(url);
