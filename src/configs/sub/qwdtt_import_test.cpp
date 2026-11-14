@@ -542,6 +542,15 @@ int TestQwdttImport() {
         check(PR::ResolveXrayGeo(PR::SourceDocument(geoOptions), missing).contains("MISSING") && missing == beforeMissing, "missing category reports a useful error without corrupting the config");
     }
     {
+        // A server test without the provider's geo files keeps everything but the rules that need them.
+        auto config = QJsonDocument::fromJson(R"({"routing":{"rules":[{"domain":["geosite:ru"],"outboundTag":"direct"},{"ip":["!geoip:ru"]},{"domain":["example.com"],"outboundTag":"block"}]},"dns":{"servers":[{"address":"1.1.1.1","domains":["geosite:ru"]},"8.8.8.8"]},"outbounds":[{"tag":"proxy"}]})").object();
+        PR::DropGeoRules(config);
+        const auto rules = config["routing"].toObject()["rules"].toArray();
+        const auto servers = config["dns"].toObject()["servers"].toArray();
+        check(rules.size() == 1 && rules[0].toObject()["outboundTag"].toString() == "block" && servers.size() == 1 && servers[0].toString() == "8.8.8.8" &&
+              config["outbounds"].toArray().size() == 1, "a test without geo files drops only the rules and DNS servers that need them");
+    }
+    {
         QTableView table;
         QStandardItemModel model(2, ProfilesTableModel::ColumnCount);
         auto *header = new ProfilesTableFilterHeader(&table);

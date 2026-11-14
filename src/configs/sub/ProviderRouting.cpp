@@ -446,6 +446,21 @@ QString ResolveGeo(Configs::RouteProfile &profile, const QJsonObject &doc) {
         }
     return {};
 }
+void DropGeoRules(QJsonObject &config) {
+    const auto drop = [](QJsonObject owner, const QString &key) {
+        QJsonArray kept;
+        for (const auto &item : owner.value(key).toArray()) {
+            const auto text = item.isObject() ? QString::fromUtf8(QJsonDocument(item.toObject()).toJson(QJsonDocument::Compact)) : item.toString();
+            if (!text.contains("geosite:") && !text.contains("geoip:")) kept.append(item);
+        }
+        owner[key] = kept;
+        return owner;
+    };
+    if (config.value("routing").isObject() && config.value("routing").toObject().value("rules").isArray())
+        config["routing"] = drop(config.value("routing").toObject(), "rules");
+    if (config.value("dns").isObject() && config.value("dns").toObject().value("servers").isArray())
+        config["dns"] = drop(config.value("dns").toObject(), "servers");
+}
 QString ResolveXrayGeo(const QJsonObject &document, QJsonObject &config) {
     auto doc = document;
     if (doc.isEmpty()) {

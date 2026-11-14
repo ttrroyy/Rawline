@@ -2196,6 +2196,11 @@ namespace Configs {
                 // An imported Happ / Incy routing profile supplies them otherwise.
                 if (geoDocument.isEmpty()) geoDocument = ctx.providerRouting;
                 ctx.error = Subscription::ProviderRouting::ResolveXrayGeo(geoDocument, userXrayConfig);
+                // A ping goes through the proxy: without the provider's geo files the test drops the rules that need them.
+                if (!ctx.error.isEmpty() && ctx.forTest) {
+                    Subscription::ProviderRouting::DropGeoRules(userXrayConfig);
+                    ctx.error.clear();
+                }
                 if (!ctx.error.isEmpty()) return ingressTag;
                 // A pre-probed 0 means the caller's probe failed; re-probe rather than bake in a dead port.
                 int port = req.xrayFullConfigPort;

@@ -32,6 +32,8 @@ QString PrepareGeo(const QJsonObject &document, const QString &kind, QString &pa
 void PrepareGeoInBackground(const QList<Command> &commands);
 QString ResolveGeo(Configs::RouteProfile &profile, const QJsonObject &document);
 QString ResolveXrayGeo(const QJsonObject &document, QJsonObject &config);
+// [config] without the routing rules and DNS servers that name a geosite: or geoip: category (a server test without the files).
+void DropGeoRules(QJsonObject &config);
 QString Dns(const QJsonObject &document, const QString &prefix, const QString &fallback);
 QStringList Hosts(const QJsonObject &document);
 bool Truth(const QJsonObject &document, const QString &key, bool fallback);
