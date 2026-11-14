@@ -1065,7 +1065,8 @@ namespace Subscription {
 
         QString announceMsg = decodeHeaderValue(NetworkRequestHelper::GetHeader(resp.header, "Announce"));
         if (!announceMsg.isEmpty()) {
-            subInfo.announce = announceMsg;
+            // A header holds no line breaks: providers write them as a backslash and n.
+            subInfo.announce = QString(announceMsg).replace("\\n", "\n");
             subInfo.valid = true;
         }
 
@@ -1156,7 +1157,7 @@ namespace Subscription {
                 subInfo.support_url = valStr;
                 if (!subInfo.support_url.isEmpty()) subInfo.valid = true;
             } else if (subInfo.announce.isEmpty() && (scan::startsWithNoCase(key, "announce") || scan::startsWithNoCase(key, "notice"))) {
-                subInfo.announce = decodeHeaderValue(valStr);
+                subInfo.announce = decodeHeaderValue(valStr).replace("\\n", "\n");
                 if (!subInfo.announce.isEmpty()) subInfo.valid = true;
             }
 
