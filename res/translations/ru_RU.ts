@@ -4470,14 +4470,6 @@ A domain listed with only one address family is answered NXDOMAIN for the other,
         <translation>Находит DNS-резолверы, которые пропускают туннель одного из ваших профилей DNSTT, MasterDNS или XDNS.</translation>
     </message>
     <message>
-        <source>Find working settings</source>
-        <translation>Поиск рабочих настроек</translation>
-    </message>
-    <message>
-        <source>Try variants of one profile's anti-censorship settings several times each and rank them; nothing changes in the profile until you apply a result.</source>
-        <translation>Каждый вариант настроек обхода цензуры одного профиля проверяется несколько раз, и варианты ранжируются; профиль не меняется, пока вы не примените результат.</translation>
-    </message>
-    <message>
         <source>Scan %1</source>
         <translation>Сканирование %1</translation>
     </message>
@@ -5061,10 +5053,6 @@ A domain listed with only one address family is answered NXDOMAIN for the other,
         <translation>Резервные задержки для проверки</translation>
     </message>
     <message>
-        <source>Find working settings</source>
-        <translation>Поиск рабочих настроек</translation>
-    </message>
-    <message>
         <source>Finds the largest MTU that still works.</source>
         <translation>Находит наибольший рабочий MTU.</translation>
     </message>
@@ -5271,10 +5259,6 @@ A domain listed with only one address family is answered NXDOMAIN for the other,
     <message>
         <source>Time limit (minutes)</source>
         <translation>Лимит времени (минуты)</translation>
-    </message>
-    <message>
-        <source>Variants of this profile's anti-censorship settings are tested through the core, one attempt at a time. The profile itself changes only when you apply a result.</source>
-        <translation>Варианты настроек обхода цензуры этого профиля проверяются через ядро, по одной попытке за раз. Сам профиль меняется, только когда вы применяете результат.</translation>
     </message>
     <message>
         <source>What to try</source>
@@ -10082,10 +10066,6 @@ Grant them once with a Windows confirmation; Rawline itself keeps running as a s
         <translation>Не удалось проверить сервисы: %1</translation>
     </message>
     <message>
-        <source>Find working settings…</source>
-        <translation>Поиск рабочих настроек…</translation>
-    </message>
-    <message>
         <source>The core did not get administrator rights, although they were granted. The log shows why.
 
 Restart Rawline as administrator to use Tun Mode and the kill switch.</source>
@@ -14399,10 +14379,6 @@ Remove that endpoint from this routing profile as well?</source>
         </translation>
     </message>
     <message>
-        <source>Find working settings</source>
-        <translation>Поиск рабочих настроек</translation>
-    </message>
-    <message>
         <source>Only a saved profile can be searched; save the profile first.</source>
         <translation>Подбирать можно только сохранённый профиль; сначала сохраните профиль.</translation>
     </message>
@@ -14421,10 +14397,6 @@ Remove that endpoint from this routing profile as well?</source>
     <message>
         <source>The profile or the search options changed since this search was paused, so it cannot resume. Start over?</source>
         <translation>Профиль или параметры поиска изменились после его приостановки, поэтому продолжить нельзя. Начать заново?</translation>
-    </message>
-    <message>
-        <source>Working settings</source>
-        <translation>Рабочие настройки</translation>
     </message>
     <message numerus="yes">
         <source>Starting over clears the %n result(s) this scan has found. Continue?</source>
@@ -18605,236 +18577,6 @@ connection</source>
     <message>
         <source>Time limit per resolver. Empty: the test's default.</source>
         <translation>Ограничение времени на один резолвер. Пусто: значение по умолчанию для проверки.</translation>
-    </message>
-</context>
-<context>
-    <name>ScanTuneSettings</name>
-    <message>
-        <source>Profile</source>
-        <translation>Профиль</translation>
-    </message>
-    <message>
-        <source>Variants of this profile's anti-censorship settings are tested through the core, one attempt at a time. The profile itself changes only when you apply a result.</source>
-        <translation>Варианты настроек обхода цензуры этого профиля проверяются через ядро, по одной попытке за раз. Сам профиль меняется, только когда вы применяете результат.</translation>
-    </message>
-    <message>
-        <source>What to try</source>
-        <translation>Что проверять</translation>
-    </message>
-    <message>
-        <source>Each setting is first tried on its own, a switch flipped or a list value by value; the changes that help are then combined.</source>
-        <translation>Сначала каждая настройка проверяется отдельно: переключатель — в обратном положении, список — значение за значением; затем полезные изменения объединяются.</translation>
-    </message>
-    <message>
-        <source>uTLS fingerprint</source>
-        <translation>uTLS fingerprint</translation>
-    </message>
-    <message>
-        <source>Fingerprints to try</source>
-        <translation>Проверяемые fingerprint</translation>
-    </message>
-    <message>
-        <source>TLS fragment</source>
-        <translation>Фрагментация TLS</translation>
-    </message>
-    <message>
-        <source>Fallback delays to try</source>
-        <translation>Резервные задержки для проверки</translation>
-    </message>
-    <message>
-        <source>TLS record fragment</source>
-        <translation>Фрагментация записи TLS</translation>
-    </message>
-    <message>
-        <source>Mixed-case SNI</source>
-        <translation>SNI в смешанном регистре</translation>
-    </message>
-    <message>
-        <source>QUIC opener</source>
-        <translation>QUIC-приманка</translation>
-    </message>
-    <message>
-        <source>MTU (WireGuard)</source>
-        <translation>MTU (WireGuard)</translation>
-    </message>
-    <message>
-        <source>Smallest MTU</source>
-        <translation>Наименьший MTU</translation>
-    </message>
-    <message>
-        <source>Largest MTU</source>
-        <translation>Наибольший MTU</translation>
-    </message>
-    <message>
-        <source>The profile's own</source>
-        <translation>Значение профиля</translation>
-    </message>
-    <message>
-        <source>MTU step</source>
-        <translation>Шаг MTU</translation>
-    </message>
-    <message>
-        <source>Download URL</source>
-        <translation>URL загрузки</translation>
-    </message>
-    <message>
-        <source>Download size (bytes)</source>
-        <translation>Размер загрузки (байт)</translation>
-    </message>
-    <message>
-        <source>Pacing</source>
-        <translation>Темп</translation>
-    </message>
-    <message>
-        <source>Attempts per variant</source>
-        <translation>Попыток на вариант</translation>
-    </message>
-    <message>
-        <source>More attempts tell a working variant from a lucky one.</source>
-        <translation>Больше попыток помогает отличить рабочий вариант от случайно удачного.</translation>
-    </message>
-    <message>
-        <source>Attempts per minute</source>
-        <translation>Попыток в минуту</translation>
-    </message>
-    <message>
-        <source>At most this many attempts start in any minute.</source>
-        <translation>Не больше стольких попыток начинается за любую минуту.</translation>
-    </message>
-    <message>
-        <source>Attempt limit</source>
-        <translation>Лимит попыток</translation>
-    </message>
-    <message>
-        <source>The search stops after this many attempts in all.</source>
-        <translation>Поиск останавливается после стольких попыток в сумме.</translation>
-    </message>
-    <message>
-        <source>Time limit (minutes)</source>
-        <translation>Лимит времени (минуты)</translation>
-    </message>
-    <message>
-        <source>The search stops after this many minutes.</source>
-        <translation>Поиск останавливается через столько минут.</translation>
-    </message>
-    <message>
-        <source>Test URL</source>
-        <translation>URL проверки</translation>
-    </message>
-    <message>
-        <source>Requested through the profile on every attempt.</source>
-        <translation>Запрашивается через профиль при каждой попытке.</translation>
-    </message>
-    <message>
-        <source>Timeout (ms)</source>
-        <translation>Таймаут (мс)</translation>
-    </message>
-</context>
-<context>
-    <name>Scanner::Tune</name>
-    <message>
-        <source>The profile could not be read</source>
-        <translation>Не удалось прочитать профиль</translation>
-    </message>
-    <message>
-        <source>A chain cannot be searched as a whole; run the search on the profiles of its hops</source>
-        <translation>Цепочку нельзя проверить целиком; запустите поиск для профилей её звеньев</translation>
-    </message>
-    <message>
-        <source>Xray profiles are not supported yet: the search changes sing-box settings</source>
-        <translation>Профили Xray пока не поддерживаются: поиск меняет настройки sing-box</translation>
-    </message>
-    <message>
-        <source>This profile has no setting the search can change: that needs TLS over TCP, QUIC or WireGuard</source>
-        <translation>У этого профиля нет настроек, которые может менять поиск: для этого нужен TLS поверх TCP, QUIC или WireGuard</translation>
-    </message>
-    <message>
-        <source>The MTU applies only to WireGuard profiles</source>
-        <translation>MTU применяется только к профилям WireGuard</translation>
-    </message>
-    <message>
-        <source>The profile no longer uses TLS over TCP</source>
-        <translation>Профиль больше не использует TLS поверх TCP</translation>
-    </message>
-    <message>
-        <source>This type of profile has no uTLS fingerprint</source>
-        <translation>У профилей этого типа нет uTLS fingerprint</translation>
-    </message>
-    <message>
-        <source>Unknown setting “%1”</source>
-        <translation>Неизвестная настройка «%1»</translation>
-    </message>
-    <message>
-        <source>The profile as it is</source>
-        <translation>Профиль без изменений</translation>
-    </message>
-    <message>
-        <source>uTLS off</source>
-        <translation>uTLS выкл.</translation>
-    </message>
-    <message>
-        <source>Fingerprint %1</source>
-        <translation>Fingerprint %1</translation>
-    </message>
-    <message>
-        <source>TLS fragment on</source>
-        <translation>Фрагментация TLS вкл.</translation>
-    </message>
-    <message>
-        <source>TLS fragment off</source>
-        <translation>Фрагментация TLS выкл.</translation>
-    </message>
-    <message>
-        <source>Fragment delay %1</source>
-        <translation>Задержка фрагментации %1</translation>
-    </message>
-    <message>
-        <source>default</source>
-        <translation>по умолчанию</translation>
-    </message>
-    <message>
-        <source>Record fragment on</source>
-        <translation>Фрагментация записи вкл.</translation>
-    </message>
-    <message>
-        <source>Record fragment off</source>
-        <translation>Фрагментация записи выкл.</translation>
-    </message>
-    <message>
-        <source>Mixed-case SNI on</source>
-        <translation>SNI в смешанном регистре вкл.</translation>
-    </message>
-    <message>
-        <source>Mixed-case SNI off</source>
-        <translation>SNI в смешанном регистре выкл.</translation>
-    </message>
-    <message>
-        <source>QUIC opener on</source>
-        <translation>QUIC-приманка вкл.</translation>
-    </message>
-    <message>
-        <source>QUIC opener off</source>
-        <translation>QUIC-приманка выкл.</translation>
-    </message>
-    <message>
-        <source>MTU %1</source>
-        <translation>MTU %1</translation>
-    </message>
-    <message>
-        <source>“%1” changes from one start to the next, so it cannot be tried</source>
-        <translation>«%1» меняется при каждом запуске, поэтому его нельзя проверить</translation>
-    </message>
-    <message>
-        <source>“%1” is not a uTLS fingerprint</source>
-        <translation>«%1» — не uTLS fingerprint</translation>
-    </message>
-    <message>
-        <source>Fragment delay “%1”: %2</source>
-        <translation>Задержка фрагментации «%1»: %2</translation>
-    </message>
-    <message>
-        <source>The largest MTU must be above the smallest</source>
-        <translation>Наибольший MTU должен быть больше наименьшего</translation>
     </message>
 </context>
 <context>

@@ -36,6 +36,16 @@ class InterfaceRegressions(unittest.TestCase):
     def test_advanced_interface_is_the_default(self):
         self.assertNotRegex(read("src/database/SettingsRepo.cpp"), r"simple_mode\s*=\s*true")
 
+    def test_retired_dpi_tuning_does_not_remove_address_scanning(self):
+        cmake = read("CMakeLists.txt")
+        self.assertNotIn("TuneWorker", cmake)
+        self.assertNotIn("menu_find_settings", read("include/ui/mainwindow.ui"))
+        for text in ("Generic scan", "WARP scan", "DNS resolver scan"):
+            self.assertIn(text, read("src/ui/scanner/dialog_new_scan.cpp"))
+        self.assertIn("Resolver = 2, Retired = 3", read("include/database/entities/IpScan.h"))
+        self.assertIn("Kind::Retired", read("src/ui/scanner/dialog_scan_instance.cpp"))
+        self.assertNotIn("DROP COLUMN", read("src/database/IpScansRepo.cpp"))
+
     def test_process_lookup_is_forced_only_on_windows(self):
         text = read("src/configs/generate.cpp")
         at = text.index('route["find_process"] = true')

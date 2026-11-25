@@ -2,6 +2,7 @@ package rpc
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -165,7 +166,12 @@ func TestUserConnectionWaitsForProbeCleanup(t *testing.T) {
 	}
 	defer release()
 	cleanupDone := make(chan struct{})
-	go func() { time.Sleep(150 * time.Millisecond); release(); close(cleanupDone) }()
+	go func() {
+		time.Sleep(150 * time.Millisecond)
+		// Record completion before waking the connection waiting for the released slot.
+		close(cleanupDone)
+		release()
+	}()
 	dir := t.TempDir()
 	// Missing executable is intentional: reaching process creation proves we waited
 	// past the old 100ms gate instead of rejecting the user's connection as busy.
@@ -178,7 +184,7 @@ func TestUserConnectionWaitsForProbeCleanup(t *testing.T) {
 	default:
 		t.Fatal("user connection rejected before probe cleanup")
 	}
-	if err == nil || len(extraSessions) != 0 {
-		t.Fatal("invalid child did not roll back after acquiring the freed device")
+	if !errors.Is(err, os.ErrNotExist) || len(extraSessions) != 0 {
+		t.Fatalf("missing child did not roll back after acquiring the freed device: %v", err)
 	}
 }
