@@ -13723,6 +13723,53 @@ Release note:
     </message>
 </context>
 <context>
+    <name>ServiceCheck</name>
+    <message>
+        <source>Available</source>
+        <translation>Доступно</translation>
+    </message>
+    <message>
+        <source>Partially available</source>
+        <translation>Частичная доступность</translation>
+    </message>
+    <message>
+        <source>Access restricted</source>
+        <translation>Доступ ограничен</translation>
+    </message>
+    <message>
+        <source>Access denied</source>
+        <translation>Доступ отклонён</translation>
+    </message>
+    <message>
+        <source>Check error</source>
+        <translation>Ошибка проверки</translation>
+    </message>
+    <message>
+        <source>DNS resolution failed</source>
+        <translation>Ошибка разрешения имени (DNS)</translation>
+    </message>
+    <message>
+        <source>TLS handshake failed</source>
+        <translation>Ошибка рукопожатия TLS</translation>
+    </message>
+    <message>
+        <source>Connection interrupted</source>
+        <translation>Соединение прервано</translation>
+    </message>
+    <message>
+        <source>Transfer interrupted after 16–20 KiB</source>
+        <translation>Передача прервана после 16–20 КиБ</translation>
+    </message>
+    <message>
+        <source>Signs of traffic filtering (DPI)</source>
+        <translation>Признаки фильтрации трафика (DPI)</translation>
+    </message>
+    <message>
+        <source>Inconclusive result</source>
+        <translation>Результат не определён</translation>
+    </message>
+</context>
+<context>
     <name>QPlatformTheme</name>
     <message>
         <source>Cancel</source>

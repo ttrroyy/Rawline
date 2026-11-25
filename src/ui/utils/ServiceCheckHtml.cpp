@@ -1,10 +1,12 @@
 #include "include/ui/utils/ServiceCheckHtml.h"
 
+#include <QCoreApplication>
 #include <QDateTime>
 #include <QDialog>
 #include <QDialogButtonBox>
 #include <QScreen>
 #include <QTextBrowser>
+#include <QTextOption>
 #include <QVBoxLayout>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -67,18 +69,17 @@ namespace {
     }
 
     QString serviceStatusText(const QString &status) {
-        if (status == "available") return QObject::tr("Available");
-        if (status == "partial") return QObject::tr("Partial");
-        if (status == "restricted") return QObject::tr("Restricted");
-        if (status == "blocked") return QObject::tr("Blocked");
-        if (status == "unknown") return QObject::tr("Unknown");
-        if (status == "failed") return QObject::tr("Failed");
-        if (status == "dns_failure") return QObject::tr("DNS failure");
-        if (status == "tls_failure") return QObject::tr("TLS failure");
-        if (status == "interrupted") return QObject::tr("Connection interrupted");
-        if (status == "short_body") return QObject::tr("Transfer interrupted at 16–20 KiB");
-        if (status == "filter_pattern") return QObject::tr("Likely DPI filtering");
-        return status;
+        if (status == "available") return QCoreApplication::translate("ServiceCheck", "Available");
+        if (status == "partial") return QCoreApplication::translate("ServiceCheck", "Partially available");
+        if (status == "restricted") return QCoreApplication::translate("ServiceCheck", "Access restricted");
+        if (status == "blocked") return QCoreApplication::translate("ServiceCheck", "Access denied");
+        if (status == "failed") return QCoreApplication::translate("ServiceCheck", "Check error");
+        if (status == "dns_failure") return QCoreApplication::translate("ServiceCheck", "DNS resolution failed");
+        if (status == "tls_failure") return QCoreApplication::translate("ServiceCheck", "TLS handshake failed");
+        if (status == "interrupted") return QCoreApplication::translate("ServiceCheck", "Connection interrupted");
+        if (status == "short_body") return QCoreApplication::translate("ServiceCheck", "Transfer interrupted after 16–20 KiB");
+        if (status == "filter_pattern") return QCoreApplication::translate("ServiceCheck", "Signs of traffic filtering (DPI)");
+        return QCoreApplication::translate("ServiceCheck", "Inconclusive result");
     }
 
     QString serviceDiagnosticNote(const QString &note) {
@@ -159,10 +160,10 @@ namespace ServiceCheckHtml {
             return html + QStringLiteral("<p style=\"color:%1\">%2</p></qt>").arg(themeManager()->tokens.danger.name(), error.toHtmlEscaped());
         }
         const auto heading = [](const QString &text) {
-            return QStringLiteral("<tr><td colspan=\"3\" style=\"padding-top:8px\"><b>%1</b></td></tr>").arg(text.toHtmlEscaped());
+            return QStringLiteral("<h4>%1</h4>").arg(text.toHtmlEscaped());
         };
-        html += QStringLiteral("<table cellspacing=\"0\" cellpadding=\"2\">");
         const auto checks = root["checks"].toArray();
+        const auto muted = themeManager()->tokens.muted.name();
         for (const auto &categoryValue : root["cats"].toArray()) {
             const auto category = categoryValue.toObject();
             const auto id = category["id"].toString();
@@ -172,24 +173,26 @@ namespace ServiceCheckHtml {
                 if (check["cat"].toString() != id) continue;
                 const auto status = check["status"].toString();
                 const auto color = serviceStatusColor(status);
-                QStringList extra;
-                if (const auto region = check["region"].toString(); !region.isEmpty()) extra << region;
-                if (const auto note = check["note"].toString(); !note.isEmpty()) extra << serviceDiagnosticNote(note);
-                // width="1%" + nowrap: the first two columns shrink to their text and the note gets the rest.
-                html += QStringLiteral("<tr><td width=\"1%\" style=\"padding-right:12px\">%1</td>"
-                                       "<td width=\"1%\" style=\"color:%2; white-space:nowrap; padding-right:12px\">%3</td><td>%4</td></tr>")
-                            .arg(serviceColored(check["name"].toString(), color), color.name(),
-                                 serviceStatusText(status).toHtmlEscaped(), extra.join(QStringLiteral(" — ")).toHtmlEscaped());
+                auto label = serviceStatusText(status);
+                if (const auto region = check["region"].toString(); !region.isEmpty()) label += QStringLiteral(" · ") + region;
+                html += QStringLiteral("<p style=\"margin-top:4px; margin-bottom:4px\"><b>%1</b> "
+                                       "<span style=\"color:%2\">%3</span>")
+                            .arg(check["name"].toString().toHtmlEscaped(), color.name(), label.toHtmlEscaped());
+                if (const auto note = check["note"].toString(); !note.isEmpty()) {
+                    html += QStringLiteral("<br><span style=\"color:%1\">%2</span>")
+                                .arg(muted, serviceDiagnosticNote(note).toHtmlEscaped());
+                }
+                html += QStringLiteral("</p>");
             }
         }
         if (const auto ip = root["ip"].toArray(); !ip.isEmpty()) {
             html += heading(QObject::tr("IP"));
-            if (const auto kind = serviceIpKind(ip); !kind.isEmpty()) html += QStringLiteral("<tr><td colspan=\"3\">%1</td></tr>").arg(kind);
+            if (const auto kind = serviceIpKind(ip); !kind.isEmpty()) html += QStringLiteral("<p>%1</p>").arg(kind);
             for (const auto &entry : ip) {
-                html += QStringLiteral("<tr><td colspan=\"3\">%1</td></tr>").arg(serviceIpLine(entry.toObject()).toHtmlEscaped());
+                html += QStringLiteral("<p>%1</p>").arg(serviceIpLine(entry.toObject()).toHtmlEscaped());
             }
         }
-        return html + QStringLiteral("</table></qt>");
+        return html + QStringLiteral("</qt>");
     }
 
     void showReport(QWidget *parent, const QList<int> &ids, qint64 startedAt) {
@@ -209,6 +212,9 @@ namespace ServiceCheckHtml {
         window->setWindowTitle(QObject::tr("Service Check"));
         auto *layout = new QVBoxLayout(window);
         auto *text = new QTextBrowser(window);
+        text->setLineWrapMode(QTextEdit::WidgetWidth);
+        text->setWordWrapMode(QTextOption::WrapAtWordBoundaryOrAnywhere);
+        text->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
         text->setHtml(sections.join(QStringLiteral("<hr>")));
         layout->addWidget(text);
         auto *buttons = new QDialogButtonBox(QDialogButtonBox::Close, window);
