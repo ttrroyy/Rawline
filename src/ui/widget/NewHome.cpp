@@ -354,6 +354,17 @@ namespace {
             window->setProperty("rawlineSavedCaptionBits", QVariant());
         }
         if (newStyle != oldStyle) SetWindowLongPtrW(hwnd, GWL_STYLE, newStyle);
+        if (NewStyle::active() || savedWindow == quint64(id)) {
+            using SetAttribute = HRESULT(WINAPI *)(HWND, DWORD, LPCVOID, DWORD);
+            static const auto set = [] {
+                const HMODULE dwm = LoadLibraryW(L"dwmapi.dll");
+                return dwm ? reinterpret_cast<SetAttribute>(GetProcAddress(dwm, "DwmSetWindowAttribute")) : nullptr;
+            }();
+            // The same HWND retains its former rendering mode across a style change.
+            // Explicitly give the system caption back to DWM before recalculating the frame.
+            const DWORD policy = NewStyle::active() ? 1 /* DWMNCRP_DISABLED */ : 2 /* DWMNCRP_ENABLED */;
+            if (set) set(hwnd, 2 /* DWMWA_NCRENDERING_POLICY */, &policy, sizeof policy);
+        }
         SetWindowPos(hwnd, nullptr, 0, 0, 0, 0,
                      SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
         NewStyle::themeFrame(window);
