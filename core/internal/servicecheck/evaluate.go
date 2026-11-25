@@ -1,9 +1,15 @@
 package servicecheck
 
 import (
+	"context"
+	"errors"
 	"fmt"
+	"io"
+	"net"
 	"net/http"
 	"strconv"
+	"strings"
+	"syscall"
 )
 
 // Response is what one request of a check produced. A request that failed after a redirect keeps
@@ -59,7 +65,7 @@ func (c *Check) fallback(responses []*Response) (string, string) {
 			continue
 		}
 		if r.Err != nil {
-			return StatusFailed, shortError(r.Err)
+			return classifyFailure(r), shortError(r.Err)
 		}
 		last = r
 	}
@@ -67,6 +73,33 @@ func (c *Check) fallback(responses []*Response) (string, string) {
 		return StatusFailed, "not run"
 	}
 	return StatusUnknown, "unexpected response (HTTP " + strconv.Itoa(last.Status) + ")"
+}
+
+type tlsHandshakeError struct{ error }
+
+func (e *tlsHandshakeError) Unwrap() error { return e.error }
+
+func classifyFailure(r *Response) string {
+	var dns *net.DNSError
+	if errors.As(r.Err, &dns) {
+		return StatusDNSFailure
+	}
+	var handshake *tlsHandshakeError
+	if errors.As(r.Err, &handshake) {
+		return StatusTLSFailure
+	}
+	reset := errors.Is(r.Err, syscall.ECONNRESET) || errors.Is(r.Err, syscall.EPIPE)
+	shortRead := reset || errors.Is(r.Err, io.ErrUnexpectedEOF) || errors.Is(r.Err, context.DeadlineExceeded)
+	encoding := strings.ToLower(r.Header.Get("Content-Encoding"))
+	declared, _ := strconv.Atoi(r.Header.Get("Content-Length"))
+	if shortRead && r.Status >= 200 && r.Status < 300 && (encoding == "" || encoding == "identity") &&
+		len(r.Body) >= 16*1024 && len(r.Body) <= 20*1024 && declared > len(r.Body) {
+		return StatusShortBody
+	}
+	if reset || errors.Is(r.Err, io.ErrUnexpectedEOF) {
+		return StatusInterrupted
+	}
+	return StatusFailed
 }
 
 func (c *Check) region(responses []*Response) string {

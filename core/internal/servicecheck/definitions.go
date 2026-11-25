@@ -44,17 +44,22 @@ const (
 )
 
 const (
-	StatusAvailable  = "available"
-	StatusPartial    = "partial"
-	StatusRestricted = "restricted"
-	StatusBlocked    = "blocked"
-	StatusUnknown    = "unknown"
-	StatusFailed     = "failed"
+	StatusAvailable   = "available"
+	StatusPartial     = "partial"
+	StatusRestricted  = "restricted"
+	StatusBlocked     = "blocked"
+	StatusUnknown     = "unknown"
+	StatusFailed      = "failed"
+	StatusDNSFailure  = "dns_failure"
+	StatusTLSFailure  = "tls_failure"
+	StatusInterrupted = "interrupted"
+	StatusShortBody   = "short_body"
 )
 
 var validStatuses = map[string]bool{
 	StatusAvailable: true, StatusPartial: true, StatusRestricted: true,
 	StatusBlocked: true, StatusUnknown: true, StatusFailed: true,
+	StatusDNSFailure: true, StatusTLSFailure: true, StatusInterrupted: true, StatusShortBody: true,
 }
 
 type Definitions struct {
@@ -419,7 +424,9 @@ func parseRequest(r *requestJSON) (*Request, error) {
 		return nil, fmt.Errorf("at most %d headers", maxHeadersPerRequest)
 	}
 	for name, value := range r.Headers {
-		if !tokenPattern.MatchString(name) || forbiddenHeaders[strings.ToLower(name)] {
+		lowerName := strings.ToLower(name)
+		identityEncoding := lowerName == "accept-encoding" && value == "identity"
+		if !tokenPattern.MatchString(name) || (forbiddenHeaders[lowerName] && !identityEncoding) {
 			return nil, fmt.Errorf("header %q not allowed", name)
 		}
 		if len(value) > 1024 || !httpguts.ValidHeaderFieldValue(value) {

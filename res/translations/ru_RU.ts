@@ -13713,6 +13713,22 @@ Release note:
         <source>The core did not answer.</source>
         <translation>Ядро не ответило.</translation>
     </message>
+    <message>
+        <source>DNS failure</source>
+        <translation>Ошибка DNS</translation>
+    </message>
+    <message>
+        <source>TLS failure</source>
+        <translation>Ошибка TLS</translation>
+    </message>
+    <message>
+        <source>Connection interrupted</source>
+        <translation>Соединение прервано</translation>
+    </message>
+    <message>
+        <source>Transfer interrupted at 16–20 KiB (possible DPI)</source>
+        <translation>Обрыв на 16–20 КиБ (возможен DPI)</translation>
+    </message>
 </context>
 <context>
     <name>QPlatformTheme</name>

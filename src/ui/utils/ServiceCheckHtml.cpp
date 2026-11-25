@@ -30,8 +30,8 @@ namespace {
     QColor serviceStatusColor(const QString &status) {
         const auto &tokens = themeManager()->tokens;
         if (status == "available") return tokens.success;
-        if (status == "partial") return tokens.warning;
-        if (status == "restricted" || status == "blocked") return tokens.danger;
+        if (status == "partial" || status == "short_body" || status == "interrupted") return tokens.warning;
+        if (status == "restricted" || status == "blocked" || status == "dns_failure" || status == "tls_failure") return tokens.danger;
         return tokens.muted;
     }
 
@@ -72,6 +72,10 @@ namespace {
         if (status == "blocked") return QObject::tr("Blocked");
         if (status == "unknown") return QObject::tr("Unknown");
         if (status == "failed") return QObject::tr("Failed");
+        if (status == "dns_failure") return QObject::tr("DNS failure");
+        if (status == "tls_failure") return QObject::tr("TLS failure");
+        if (status == "interrupted") return QObject::tr("Connection interrupted");
+        if (status == "short_body") return QObject::tr("Transfer interrupted at 16–20 KiB (possible DPI)");
         return status;
     }
 

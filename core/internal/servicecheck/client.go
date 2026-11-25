@@ -203,7 +203,7 @@ func (s *session) send(ctx context.Context, req *http.Request) (*http.Response, 
 	}
 	tlsConn, err := boxtls.ClientHandshake(ctx, conn, config)
 	if err != nil {
-		return nil, err
+		return nil, &tlsHandshakeError{err}
 	}
 	if tlsConn.ConnectionState().NegotiatedProtocol == "h2" {
 		cc, err := s.transport.NewClientConn(tlsConn)
