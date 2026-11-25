@@ -546,11 +546,9 @@ set(PROJECT_SOURCES
         src/ui/scanner/dialog_new_scan.cpp
         include/ui/scanner/dialog_new_scan.h
         src/ui/scanner/dialog_scan_instance.cpp
-        src/ui/scanner/dialog_scan_instance_tune.cpp
         include/ui/scanner/dialog_scan_instance.h
         include/ui/scanner/dialog_scan_instance.ui
         include/ui/scanner/scan_phases.ui
-        include/ui/scanner/scan_tune_settings.ui
         src/ui/scanner/IpEntriesModel.cpp
         include/ui/scanner/IpEntriesModel.h
         src/ui/scanner/dialog_ip_lists.cpp
@@ -575,12 +573,6 @@ set(PROJECT_SOURCES
         src/scanner/ScanManager.cpp
         include/scanner/ScanWorker.h
         src/scanner/ScanWorker.cpp
-        include/scanner/TunePlanner.h
-        src/scanner/TunePlanner.cpp
-        include/scanner/TuneProfiles.h
-        src/scanner/TuneProfiles.cpp
-        include/scanner/TuneWorker.h
-        src/scanner/TuneWorker.cpp
 
         src/ui/stats/dialog_traffic_stats.cpp
         include/ui/stats/dialog_traffic_stats.h

@@ -407,7 +407,7 @@ void NewHome::runTour(MainWindow *mw, const QString &dir) {
                  std::pair{"vk-relay", mw->ui->menu_vk_relay_settings}, std::pair{"presets", mw->ui->menu_preset_settings},
                  std::pair{"integration", mw->ui->menu_integration_settings}, std::pair{"otp", mw->ui->menu_otp_manager},
                  std::pair{"scanner", mw->ui->menu_scanner}, std::pair{"traffic", mw->ui->actionTraffic_Stats},
-                 std::pair{"about", mw->ui->actionAbout}, std::pair{"find-settings", mw->ui->menu_find_settings}}) {
+                 std::pair{"about", mw->ui->actionAbout}}) {
             s << std::pair{QString::fromLatin1(name), std::function<void()>(action(a))};
         }
         s << std::pair{QStringLiteral("profile-edge-fades"), std::function<void()>([home] {
@@ -573,7 +573,9 @@ void NewHome::runTour(MainWindow *mw, const QString &dir) {
                 auto *picker = settings.findChild<QComboBox *>(QStringLiteral("theme"));
                 check(picker && picker->findText(QStringLiteral("System")) >= 0, "settings theme selector missing");
                 picker->setCurrentIndex(picker->findText(QStringLiteral("System")));
-                QApplication::processEvents();
+                QEventLoop settle;
+                QTimer::singleShot(1200, &settle, &QEventLoop::quit);
+                settle.exec();
                 check(settings.isVisible() && hasCaption(settings.winId()) && hasCaption(mainId) && mw->winId() == mainId,
                       "System lost its native frame while settings remained open");
                 using DwmGetAttribute = HRESULT(WINAPI *)(HWND, DWORD, PVOID, DWORD);

@@ -10,10 +10,8 @@
 
 #include "include/database/entities/IpList.h"
 #include "include/database/entities/IpScan.h"
-#include "include/scanner/TunePlanner.h"
 #include "ui_dialog_scan_instance.h"
 #include "ui_scan_phases.h"
-#include "ui_scan_tune_settings.h"
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
@@ -99,26 +97,13 @@ private:
     QSortFilterProxyModel *resultsProxy = nullptr;
     QTimer *resultsReload = nullptr;
 
-    // Null for a "Find working settings" scan; the boxes of phases the scan kind lacks stay hidden.
+    // The boxes of phases the scan kind lacks stay hidden.
     Ui::ScanPhases *phasesUi = nullptr;
     QHash<QString, int> configProfileIds;
     QStringListModel *configProfileNames = nullptr;
     QList<QLineEdit *> warpPackets;
     QPushButton *useAsResolvers = nullptr;
 
-    // Set only for a "Find working settings" scan.
-    Ui::ScanTuneSettings *tuneUi = nullptr;
-    QHash<QString, int> tuneProfileIds;
-    QStringListModel *tuneProfileNames = nullptr;
-    // Unsupported() verdicts by profile id, valid while ProfilesRepo::Revision() stays at tuneSupportedRevision.
-    QHash<int, bool> tuneSupported;
-    quint64 tuneSupportedRevision = 0;
-
-    QStandardItemModel *tuneModel = nullptr;
-    QList<Scanner::Tune::Trial> tuneTrials;
-    // The user picked a row, so a rebuild keeps it rather than moving to the new best.
-    bool tuneSelectionPinned = false;
-    bool tuneFilling = false;
 
     [[nodiscard]] bool isGeneric() const;
 
@@ -126,7 +111,6 @@ private:
 
     [[nodiscard]] bool isResolver() const;
 
-    [[nodiscard]] bool isTune() const;
 
     void setupTargets();
 
@@ -144,13 +128,11 @@ private:
 
     void buildResolverPhase();
 
-    void buildTunePhase(QVBoxLayout *layout);
 
     void setupProfilePicker(QComboBox *combo, QStringListModel *names);
 
     void bindValidation();
 
-    void bindTuneValidation();
 
     void setupResults();
 
@@ -186,13 +168,9 @@ private:
 
     void updateResolverTimeoutHint();
 
-    void loadTuneForm();
 
-    void reloadTuneProfiles(int selectId);
 
-    [[nodiscard]] int selectedTuneProfile() const;
 
-    void updateTuneControls();
 
     void updateHttpControls();
 
@@ -243,19 +221,12 @@ private:
 
     void removeSelectedResults();
 
-    void setupTuneResults();
 
-    void reloadTuneResults();
 
-    void updateTuneActions();
 
-    [[nodiscard]] int selectedTuneTrial() const;
 
-    void applyTuneResult();
 
-    void saveTuneResultAsProfile();
 
-    void copyTuneResults();
 
     void startClicked();
 

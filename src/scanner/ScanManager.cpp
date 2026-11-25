@@ -14,8 +14,6 @@
 #include "include/scanner/IpListUpdater.h"
 #include "include/scanner/ScanProfiles.h"
 #include "include/scanner/ScanWorker.h"
-#include "include/scanner/TuneProfiles.h"
-#include "include/scanner/TuneWorker.h"
 
 namespace Scanner {
     namespace {
@@ -93,7 +91,7 @@ namespace Scanner {
         if (workers.contains(scanId)) return {tr("The scan is already running")};
         const auto scan = Configs::dataManager->ipScansRepo->GetIpScan(scanId);
         if (scan == nullptr) return {tr("The scan no longer exists")};
-        if (scan->kind == Configs::IpScan::Kind::Tune) return startTune(scan, mode);
+        if (scan->kind == Configs::IpScan::Kind::Retired) return {tr("This scan type is no longer available.")};
         const auto &config = scan->config;
         const bool warp = scan->kind == Configs::IpScan::Kind::Warp;
         const bool resolver = scan->kind == Configs::IpScan::Kind::Resolver;
@@ -135,39 +133,6 @@ namespace Scanner {
 
         persistDisabled = false;
         auto worker = std::make_shared<ScanWorker>(*scan, effective, base, hooksFor(scanId));
-        Configs::dataManager->ipScansRepo->SaveStatus(scanId, Configs::IpScan::Status::Running, {});
-        workers.insert(scanId, worker);
-        emit statusChanged(scanId);
-        worker->Start();
-        return {};
-    }
-
-    StartResult ScanManager::startTune(const std::shared_ptr<Configs::IpScan> &scan, StartMode mode) {
-        const int scanId = scan->id;
-        const auto &options = scan->config.tune;
-        if (mode == StartMode::RescanResults) return {tr("A settings search has no results to rescan")};
-        if (const auto error = Tune::CheckOptions(options); !error.isEmpty()) return {error};
-        QString error;
-        const auto base = ResolveScanBase(*scan, &error);
-        if (base == nullptr) return {error.isEmpty() ? tr("Choose the profile to find working settings for") : error};
-        if (Tune::SpaceFor(*base, options).IsEmpty()) return {tr("Nothing to try: turn on a setting this profile supports")};
-        // The live profile, not the copy: only it knows the endpoint override it dials instead of its own address.
-        const auto dialHost = Tune::DialHost(Configs::dataManager->profilesRepo->GetProfile(options.profileId));
-        if (dialHost.isEmpty()) return {tr("The profile has no server address to test")};
-        const auto specHash = Tune::SpecHash(*base, dialHost, options);
-
-        bool resume = false;
-        if (mode == StartMode::Resume && !scan->tune_state.value(QLatin1String("trials")).toArray().isEmpty()) {
-            if (scan->spec_hash != specHash) {
-                StartResult result;
-                result.targetsChanged = true;
-                return result;
-            }
-            resume = true;
-        }
-
-        persistDisabled = false;
-        auto worker = std::make_shared<TuneWorker>(*scan, base, dialHost, specHash, resume, hooksFor(scanId));
         Configs::dataManager->ipScansRepo->SaveStatus(scanId, Configs::IpScan::Status::Running, {});
         workers.insert(scanId, worker);
         emit statusChanged(scanId);
@@ -231,7 +196,6 @@ namespace Scanner {
         ScanLiveState state;
         const auto scan = Configs::dataManager->ipScansRepo->GetIpScan(scanId);
         if (scan == nullptr) return state;
-        // A Tune scan keeps attempts in cursor and the estimated total in total.
         state.tested = scan->ActiveCursor();
         state.total = scan->ActiveTotal();
         state.found = scan->found;

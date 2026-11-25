@@ -11615,10 +11615,6 @@ Name: %1</source>
         <source>This Rawline build has no update repository configured.</source>
         <translation>В этой сборке Rawline не указан репозиторий обновлений.</translation>
     </message>
-    <message>
-        <source>Scan DPI evasion settings</source>
-        <translation>Подобрать настройки обхода DPI</translation>
-    </message>
 </context>
 <context>
     <name>OtpItem</name>

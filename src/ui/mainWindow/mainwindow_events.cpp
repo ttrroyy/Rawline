@@ -235,6 +235,16 @@ bool MainWindow::eventFilter(QObject *obj, QEvent *event) {
     }
     if (type == QEvent::MouseButtonPress) {
         auto mouseEvent = dynamic_cast<QMouseEvent *>(event);
+        if (obj == ui->profilesTableView->viewport() && mouseEvent->button() == Qt::LeftButton &&
+            (mouseEvent->modifiers() & Qt::ShiftModifier) &&
+            !ui->profilesTableView->selectionModel()->hasSelection() &&
+            ui->profilesTableView->indexAt(mouseEvent->pos()).isValid()) {
+            QMouseEvent anchor(mouseEvent->type(), mouseEvent->position(), mouseEvent->scenePosition(),
+                               mouseEvent->globalPosition(), mouseEvent->button(), mouseEvent->buttons(),
+                               Qt::NoModifier, mouseEvent->pointingDevice());
+            QCoreApplication::sendEvent(obj, &anchor);
+            return true;
+        }
         if (mouseEvent && mouseEvent->button() == Qt::LeftButton &&
             (obj == ui->masterLogBrowser->viewport() || obj == ui->data_view->viewport() || obj == ui->centralwidget || obj->objectName() == "seasonalDecorationSpace")) {
             ui->profilesTableView->clearSelection();

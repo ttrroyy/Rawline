@@ -120,7 +120,6 @@ namespace Scanner {
 
         void onWorkerFinished(int scanId);
 
-        StartResult startTune(const std::shared_ptr<Configs::IpScan> &scan, StartMode mode);
 
         [[nodiscard]] ScanRunHooks hooksFor(int scanId);
 

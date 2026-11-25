@@ -493,6 +493,11 @@ namespace {
             if (event->type() == QEvent::Show) NewStyle::themeFrame(widget);
 #ifdef Q_OS_WIN
             const auto type = event->type();
+            if (widget->isWindow() && widget->isVisible() &&
+                (type == QEvent::WindowActivate || type == QEvent::ThemeChange || type == QEvent::WinIdChange)) {
+                // Qt can refresh the native style after both the palette and the application frame have been applied.
+                QTimer::singleShot(0, widget, [widget] { NewStyle::themeFrame(widget); });
+            }
             if (widget->isWindow() && (type == QEvent::Resize || type == QEvent::WindowStateChange ||
 #if QT_VERSION >= QT_VERSION_CHECK(6, 6, 0)
                 type == QEvent::DevicePixelRatioChange ||
@@ -734,6 +739,10 @@ void NewStyle::themeFrame(QWidget *window) {
     const bool themed = active();
     clipNativeFrame(window, hwnd, themed);
     if (!set) return;
+    if (!themed) {
+        const DWORD policy = 2; // DWMNCRP_ENABLED
+        set(hwnd, 2 /* DWMWA_NCRENDERING_POLICY */, &policy, sizeof policy);
+    }
     const BOOL dark = themed ? !light() : qApp->palette().color(QPalette::Window).lightness() < 128;
     set(hwnd, 20 /* DWMWA_USE_IMMERSIVE_DARK_MODE */, &dark, sizeof dark);
     // Windows 11 paints the caption in the theme's own ground and ink; older systems ignore these.
@@ -1869,7 +1878,10 @@ void NewProfileDelegate::paint(QPainter *p, const QStyleOptionViewItem &option, 
         p->setPen(QPen(ink, 2, Qt::SolidLine, Qt::RoundCap));
         p->setBrush(Qt::NoBrush);
         const QRectF spin(resultBox.center().x() - 9, resultBox.center().y() - 9, 18, 18);
-        p->drawArc(spin, int(-spinAngle * 16), 270 * 16);
+        const auto started = index.siblingAtColumn(ProfilesTableModel::ColTestResult)
+                                 .data(ProfilesTableModel::TestSinceRole).toLongLong();
+        const auto elapsed = std::max<qint64>(0, QDateTime::currentMSecsSinceEpoch() - started);
+        p->drawArc(spin, -int(elapsed % 1000) * 5760 / 1000, 270 * 16);
     }
     if (testState != 1 && !result.isEmpty()) {
         const QVariant colour = index.siblingAtColumn(ProfilesTableModel::ColTestResult).data(Qt::ForegroundRole);
@@ -1975,6 +1987,17 @@ void NewProfileList::mousePressEvent(QMouseEvent *e) {
     m_skipRelease = false;
     if (e->button() == Qt::LeftButton) {
         const auto index = tileAt(e->position());
+        auto *selection = selectionModel();
+        const bool startRange = index.isValid() && selection && !selection->hasSelection() &&
+                                (e->modifiers() & Qt::ShiftModifier);
+        if (startRange) {
+            // Let QListView record this row as its range anchor, as it would for a plain click.
+            QMouseEvent anchor(e->type(), e->position(), e->scenePosition(), e->globalPosition(),
+                               e->button(), e->buttons(), Qt::NoModifier, e->pointingDevice());
+            QListView::mousePressEvent(&anchor);
+            e->setAccepted(anchor.isAccepted());
+            return;
+        }
         if (!index.isValid() || NewProfileDelegate::chevronRect(visualRect(index)).contains(e->pos())) {
             m_activation->stop();
             m_skipRelease = true;

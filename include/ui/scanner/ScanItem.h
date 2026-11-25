@@ -34,7 +34,6 @@ namespace ScannerUi {
     void FindResolvers(int profileId);
 
     // Opens the newest settings search of the profile, creating one when it has none.
-    void FindSettings(int profileId);
 } // namespace ScannerUi
 
 class ScanItem : public QWidget {

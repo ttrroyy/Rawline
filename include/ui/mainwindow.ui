@@ -800,7 +800,6 @@ QToolButton::menu-indicator {
     <addaction name="actionSpeedtest_Selected"/>
     <addaction name="actionResolve_Selected_Out_IP"/>
     <addaction name="actionService_Check_Selected"/>
-    <addaction name="menu_find_settings"/>
     <addaction name="menu_resolve_selected"/>
     <addaction name="actionClear_Test_Result"/>
     <addaction name="menu_reset_traffic"/>
@@ -1074,17 +1073,6 @@ QToolButton::menu-indicator {
     <string>Remember last profile</string>
    </property>
   </action>
-  <action name="actionAdvanced_Mode">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
-   <property name="text">
-    <string>Advanced Mode</string>
-   </property>
-   <property name="toolTip">
-    <string>Show every option. Simple mode hides the advanced ones; they keep their values and still apply.</string>
-   </property>
-  </action>
   <action name="actionAllow_LAN">
    <property name="checkable">
     <bool>true</bool>
@@ -1227,14 +1215,6 @@ QToolButton::menu-indicator {
   <action name="menu_scanner">
    <property name="text">
     <string>IP Scanner</string>
-   </property>
-   <property name="uiLevel" stdset="0">
-    <string notr="true">advanced</string>
-   </property>
-  </action>
-  <action name="menu_find_settings">
-   <property name="text">
-    <string>Scan DPI evasion settings</string>
    </property>
    <property name="uiLevel" stdset="0">
     <string notr="true">advanced</string>

@@ -1,3 +1,7 @@
+#include "include/ui/utils/ServiceCheckHtml.h"
+#include <QDateTime>
+#include <QPointer>
+
 #include <algorithm>
 #include <QAbstractTextDocumentLayout>
 #include <QTextDocument>
@@ -759,7 +763,6 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWi
         ui->actionAllow_LAN->setChecked(checked);
         MW_dialog_message(MwMessage::UpdateSettings, {});
     });
-    connect(ui->actionAdvanced_Mode, &QAction::triggered, this, [=,this](bool checked) { setSimpleMode(!checked); });
     applyUiMode();
     connect(ui->checkBox_VPN, &QCheckBox::clicked, this, [=,this](bool checked) { connection()->setTun(checked); });
     connect(ui->checkBox_SystemProxy, &QCheckBox::clicked, this, [=,this](bool checked) { connection()->setSystemProxy(checked); });
@@ -797,6 +800,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWi
         Configs::dataManager->settingsRepo->Save();
         refresh_proxy_list({}, true);
     });
+    ui->menu_server->setCursor(Qt::PointingHandCursor);
     connect(ui->menu_server, &QMenu::aboutToShow, this, [=,this](){
         const auto pinSelected = get_now_selected_list();
         const auto pinnedIds = Configs::dataManager->settingsRepo->pinned_profiles.split(',', Qt::SkipEmptyParts);
@@ -817,7 +821,6 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWi
             ui->actionResolve_Selected_Out_IP->setEnabled(true);
             ui->actionService_Check_Selected->setEnabled(true);
         }
-        ui->menu_find_settings->setEnabled(get_now_selected_list().size() == 1);
         if (tests()->isRunning()) {
             ui->menu_server->addAction(ui->menu_stop_testing);
         } else {
@@ -1037,15 +1040,15 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWi
         dataViewHtmlGenerator_.markTestsStopping();
         UpdateDataView(true);
     };
-    const auto togglePing = [this, stopTestsNow](const QList<int> &ids) {
-        if (profilesTableModel->hasLatencyTestAnimation(ids)) stopTestsNow();
-        else if (!tests()->isRunning() || !tests()->stopRequested()) tests()->runUrlTests(ids);
+    const auto startPing = [this](const QList<int> &ids) {
+        if (profilesTableModel->hasLatencyTestAnimation(ids) || !tests()->isRunning() || !tests()->stopRequested())
+            tests()->runUrlTests(ids);
     };
-    connect(ui->actionUrl_Test_Selected, &QAction::triggered, this, [this, togglePing]() {
-        togglePing(get_now_selected_list());
+    connect(ui->actionUrl_Test_Selected, &QAction::triggered, this, [this, startPing]() {
+        startPing(get_now_selected_list());
     });
-    connect(ui->actionUrl_Test_Group, &QAction::triggered, this, [togglePing]() {
-        if (const auto group = Configs::dataManager->groupsRepo->CurrentGroup()) togglePing(group->Profiles());
+    connect(ui->actionUrl_Test_Group, &QAction::triggered, this, [startPing]() {
+        if (const auto group = Configs::dataManager->groupsRepo->CurrentGroup()) startPing(group->Profiles());
     });
     connect(ui->actionSpeedtest_Current, &QAction::triggered, this, [=,this]()
     {
@@ -1079,7 +1082,12 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWi
                    != QMessageBox::StandardButton::Yes) {
             return;
         }
-        tests()->runServiceChecks(ids);
+        const auto startedAt = QDateTime::currentSecsSinceEpoch();
+        tests()->runServiceChecks(ids, [window = QPointer<MainWindow>(this), ids, startedAt] {
+            runOnUiThread([window, ids, startedAt] {
+                if (window) ServiceCheckHtml::showReport(window, ids, startedAt);
+            });
+        });
     };
     connect(ui->actionService_Check_Selected, &QAction::triggered, this, [this, startServiceChecks] {
         startServiceChecks(get_now_selected_list());

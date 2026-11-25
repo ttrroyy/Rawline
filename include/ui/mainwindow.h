@@ -197,7 +197,6 @@ private slots:
 
     void on_menu_scanner_triggered();
 
-    void on_menu_find_settings_triggered();
 
     void on_menu_integration_settings_triggered();
 
@@ -530,7 +529,6 @@ private:
 
     void applyUiMode();
 
-    void setSimpleMode(bool simple);
 
     // Takes or frees the one-settings-dialog slot (dialog_is_using) and lets an open command palette catch up.
     void setDialogInUse(bool inUse);

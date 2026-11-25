@@ -54,7 +54,6 @@
 #include "include/scanner/IpListUpdater.h"
 #include "include/scanner/ScanManager.h"
 #include "include/scanner/ScanProfiles.h"
-#include "include/scanner/TuneProfiles.h"
 #include "include/scanner/WarpPresets.h"
 #include "include/ui/mainwindow.h"
 #include "include/ui/scanner/IpEntriesModel.h"
@@ -327,7 +326,7 @@ void DialogScanInstance::Open(int scanId) {
         return;
     }
     auto row = Configs::dataManager->ipScansRepo->GetIpScan(scanId);
-    if (row == nullptr) return;
+    if (row == nullptr || row->kind == Configs::IpScan::Kind::Retired) return;
     auto *window = new DialogScanInstance(GetMainWindow(), row);
     windows.insert(scanId, window);
     ActivateWindow(window);
@@ -410,7 +409,6 @@ DialogScanInstance::~DialogScanInstance() {
     if (windows.value(scanId) == this || windows.value(scanId) == nullptr) windows.remove(scanId);
     if (watching) ScannerUi::Watch(scanId, false);
     delete phasesUi;
-    delete tuneUi;
     delete ui;
 }
 
@@ -424,10 +422,6 @@ bool DialogScanInstance::isWarp() const {
 
 bool DialogScanInstance::isResolver() const {
     return scan->kind == Configs::IpScan::Kind::Resolver;
-}
-
-bool DialogScanInstance::isTune() const {
-    return scan->kind == Configs::IpScan::Kind::Tune;
 }
 
 void DialogScanInstance::setupTargets() {
@@ -462,20 +456,10 @@ void DialogScanInstance::setupTargets() {
             widget->setVisible(false);
         ui->base_list->setToolTip(tr("Each address is tried as a resolver; the default port is 53."));
     }
-    if (isTune()) {
-        ui->tabs->setTabVisible(ui->tabs->indexOf(ui->tab_targets), false);
-        ui->tabs->setTabText(ui->tabs->indexOf(ui->tab_phases), tr("Settings"));
-        ui->tabs->setCurrentWidget(ui->tab_phases);
-    }
 }
 
 void DialogScanInstance::buildPhases() {
     auto *layout = ui->phases_layout;
-    if (isTune()) {
-        buildTunePhase(layout);
-        layout->addStretch(1);
-        return;
-    }
     phasesUi = new Ui::ScanPhases;
     auto *page = new QWidget(ui->phases_content);
     phasesUi->setupUi(page);
@@ -634,22 +618,6 @@ void DialogScanInstance::bindValidation() {
             return tr("Jmin must not be larger than Jmax.");
         }, this, Severity::Error, phasesUi->warp_box->title());
     }
-    if (tuneUi != nullptr) {
-        for (QLineEdit *edit : {tuneUi->mtu_min, tuneUi->mtu_step, tuneUi->mtu_bytes, tuneUi->attempts, tuneUi->per_minute,
-                                tuneUi->max_attempts, tuneUi->max_minutes, tuneUi->timeout})
-            form->bind(edit, [edit](const QString &) { return scanInstanceNumberError(edit); });
-        auto *mtuMinEdit = tuneUi->mtu_min;
-        auto *mtuMaxEdit = tuneUi->mtu_max;
-        form->bind(mtuMaxEdit, [mtuMaxEdit](const QString &text) { return text.isEmpty() ? QString() : scanInstanceNumberError(mtuMaxEdit); });
-        form->addRule({mtuMinEdit, mtuMaxEdit}, [mtuMinEdit, mtuMaxEdit] {
-            int mtuMin = 0, mtuMax = 0;
-            if (!mtuMaxEdit->isEnabled() || !scanInstanceReadNumber(mtuMinEdit, mtuMin) || !scanInstanceReadNumber(mtuMaxEdit, mtuMax) ||
-                mtuMax == 0 || mtuMax > mtuMin)
-                return QString();
-            return tr("The largest MTU must be above the smallest; leave it empty for the profile's own.");
-        }, this, Severity::Error, tuneUi->try_box->title());
-        bindTuneValidation();
-    }
 }
 
 void DialogScanInstance::setupResults() {
@@ -660,12 +628,6 @@ void DialogScanInstance::setupResults() {
     connect(ui->tabs, &QTabWidget::currentChanged, this, [this] {
         if (resultsStale && ui->tabs->currentWidget() == ui->tab_results) reloadResults();
     });
-    ui->apply_result->setVisible(isTune());
-    ui->save_result_as_profile->setVisible(isTune());
-    if (isTune()) {
-        setupTuneResults();
-        return;
-    }
 
     resultsModel = new IpEntriesModel(this);
     resultsProxy = new QSortFilterProxyModel(this);
@@ -724,7 +686,6 @@ void DialogScanInstance::loadForm() {
     ui->name->setText(scan->name);
     ui->kind->setText(isWarp()       ? tr("WARP scan")
                       : isResolver() ? tr("DNS resolver scan")
-                      : isTune()     ? tr("Find working settings")
                                      : tr("Generic scan"));
     setWindowTitle(tr("%1 - IP Scanner").arg(scan->name));
 
@@ -808,7 +769,6 @@ void DialogScanInstance::loadForm() {
         phasesUi->warp_warm->setChecked(warp.warmLatency);
     }
 
-    if (tuneUi != nullptr) loadTuneForm();
 
     updateHttpControls();
     updateWarpControls();
@@ -955,41 +915,6 @@ bool DialogScanInstance::collect(Configs::ScanConfig &out, int &baseListId, QStr
         if (amnezia && warp.jmin > warp.jmax) return fail(tr("WARP test: Jmin must not be larger than Jmax."));
     }
 
-    if (tuneUi != nullptr) {
-        auto &tune = out.tune;
-        // A control disabled for the selected profile, or by its own switch, keeps its stored value.
-        const auto active = [this](const QWidget *control) { return control->isEnabledTo(ui->phases_content); };
-        const auto field = [&number, &active](const QLineEdit *edit, int &value, const QString &rangeError) {
-            return !active(edit) || number(edit, value, true, rangeError);
-        };
-        tune.profileId = selectedTuneProfile();
-        if (active(tuneUi->fingerprints)) tune.fingerprints = tuneUi->fingerprints->isChecked();
-        if (active(tuneUi->fingerprint_list)) tune.fingerprintList = tuneUi->fingerprint_list->text().trimmed();
-        if (active(tuneUi->fragment)) tune.fragment = tuneUi->fragment->isChecked();
-        if (active(tuneUi->fragment_delays)) tune.fragmentDelays = tuneUi->fragment_delays->text().trimmed();
-        if (active(tuneUi->record_fragment)) tune.recordFragment = tuneUi->record_fragment->isChecked();
-        if (active(tuneUi->mixed_case_sni)) tune.mixedCaseSni = tuneUi->mixed_case_sni->isChecked();
-        if (active(tuneUi->quic_opener)) tune.quicOpener = tuneUi->quic_opener->isChecked();
-        if (active(tuneUi->mtu)) tune.mtu = tuneUi->mtu->isChecked();
-        if (!field(tuneUi->mtu_min, tune.mtuMin, tr("MTU: the smallest MTU must be between %1 and %2."))) return false;
-        if (active(tuneUi->mtu_max) && tuneUi->mtu_max->text().trimmed().isEmpty()) {
-            tune.mtuMax = 0;
-        } else if (!field(tuneUi->mtu_max, tune.mtuMax,
-                          tr("MTU: the largest MTU must be between %1 and %2; leave it empty for the profile's own."))) {
-            return false;
-        }
-        if (!field(tuneUi->mtu_step, tune.mtuStep, tr("MTU: the step must be between %1 and %2."))) return false;
-        if (active(tuneUi->mtu_url)) tune.mtuUrl = tuneUi->mtu_url->text().trimmed();
-        if (!field(tuneUi->mtu_bytes, tune.mtuBytes, tr("MTU: the download size must be between %1 and %2 bytes."))) return false;
-        if (!field(tuneUi->attempts, tune.attempts, tr("Pacing: attempts per variant must be between %1 and %2."))) return false;
-        if (!field(tuneUi->per_minute, tune.perMinute, tr("Pacing: attempts per minute must be between %1 and %2."))) return false;
-        if (!field(tuneUi->max_attempts, tune.maxAttempts, tr("Pacing: the attempt limit must be between %1 and %2."))) return false;
-        if (!field(tuneUi->max_minutes, tune.maxMinutes, tr("Pacing: the time limit must be between %1 and %2 minutes."))) return false;
-        tune.url = tuneUi->url->text().trimmed();
-        if (!field(tuneUi->timeout, tune.timeoutMs, tr("Pacing: the timeout must be between %1 and %2 ms."))) return false;
-        if (const auto problem = Scanner::Tune::CheckOptions(tune); !problem.isEmpty())
-            return fail(QStringLiteral("%1: %2").arg(tuneUi->try_box->title(), problem));
-    }
     return true;
 }
 
@@ -1099,10 +1024,6 @@ void DialogScanInstance::refreshProfilePickers() {
     }
     if (isWarp()) reloadWarpProfiles(phasesUi->warp_profile->currentData().toInt());
     if (isResolver()) reloadResolverProfiles(phasesUi->resolver_profile->currentData().toInt());
-    if (tuneUi != nullptr) {
-        const bool typing = tuneUi->profile->lineEdit()->isModified() && selectedTuneProfile() < 0;
-        if (!typing) reloadTuneProfiles(selectedTuneProfile());
-    }
 }
 
 void DialogScanInstance::reloadBaseLists(int selectId) {
@@ -1430,10 +1351,6 @@ void DialogScanInstance::applyLock(bool locked) {
     ui->name->setEnabled(!locked);
     ui->targets_content->setEnabled(!locked);
     ui->phases_content->setEnabled(!locked);
-    if (isTune()) {
-        updateTuneActions();
-        return;
-    }
     const bool hasResults = !resultsBusy && resultCount > 0 && resultsModel->rowCount() > 0;
     ui->remove_results->setEnabled(!locked && hasResults);
     ui->save_as_list->setEnabled(hasResults);
@@ -1464,10 +1381,6 @@ void DialogScanInstance::scheduleResultsReload() {
 void DialogScanInstance::reloadResults() {
     resultsReload->stop();
     resultsStale = false;
-    if (isTune()) {
-        reloadTuneResults();
-        return;
-    }
     ++resultsGeneration;
     // The load in flight sees the newer generation when it lands and starts this one then.
     if (resultsLoading) return;
@@ -1709,7 +1622,7 @@ void DialogScanInstance::removeSelectedResults() {
 void DialogScanInstance::startClicked() {
     reloadRow();
     // A settings search has nothing to rescan, so Start always starts over.
-    if (resultCount <= 0 || isTune()) {
+    if (resultCount <= 0) {
         startFromBeginning();
         return;
     }

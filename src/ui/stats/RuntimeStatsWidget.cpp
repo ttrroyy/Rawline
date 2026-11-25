@@ -99,16 +99,22 @@ RuntimeStatsWidget::RuntimeStatsWidget(QWidget* parent) : QWidget(parent), ui(ne
     // A lookup service's answer: as AutoText a tag in it would render as HTML.
     ui->vOutIp->setTextFormat(Qt::PlainText);
     ui->vCountry->setTextFormat(Qt::PlainText);
-    // Rich text built by ServiceCheckHtml::summary, which escapes everything it did not write itself.
-    ui->vServices->setTextFormat(Qt::RichText);
-    ui->vServices->setWordWrap(true);
     ui->vServiceChecked->setTextFormat(Qt::PlainText);
-    ui->vServiceChecked->setCursor(Qt::WhatsThisCursor);
     connect(ui->btnServiceCheck, &QPushButton::clicked, this, [this] {
         auto *engine = Engine::host();
-        if (engine == nullptr) return;
+        const auto profile = runningProfile();
+        if (!engine || !profile) return;
+        const auto startedAt = QDateTime::currentSecsSinceEpoch();
         serviceChecking_->store(true);
-        engine->tests()->runCurrentServiceCheck([checking = serviceChecking_] { checking->store(false); });
+        engine->tests()->runCurrentServiceCheck(
+            [checking = serviceChecking_, widget = QPointer<RuntimeStatsWidget>(this), id = profile->id, startedAt] {
+                checking->store(false);
+                runOnUiThread([widget, id, startedAt] {
+                    if (!widget) return;
+                    widget->refreshServices();
+                    ServiceCheckHtml::showReport(widget->window(), {id}, startedAt);
+                });
+            });
         refreshServices();
     });
 
@@ -159,23 +165,19 @@ void RuntimeStatsWidget::hideEvent(QHideEvent *event) {
 void RuntimeStatsWidget::refreshServices() {
     auto *engine = Engine::host();
     const auto running = runningProfile();
-    const QString summary = running != nullptr ? ServiceCheckHtml::summary(*running) : QString();
-    ui->vServices->setText(summary.isEmpty() ? QStringLiteral("—") : summary);
-    const QString details = running != nullptr ? ServiceCheckHtml::details(*running) : QString();
-    ui->vServices->setToolTip(details);
+    const auto checkedAt = running != nullptr ? running->ServiceCheckedAt() : 0;
 
     QString checked;
     if (serviceChecking_->load()) {
         checked = tr("Checking…");
-    } else if (!details.isEmpty()) {
-        const qint64 age = qMax<qint64>(0, QDateTime::currentSecsSinceEpoch() - running->ServiceCheckedAt());
+    } else if (checkedAt > 0) {
+        const qint64 age = qMax<qint64>(0, QDateTime::currentSecsSinceEpoch() - checkedAt);
         if (age < 60) checked = tr("Checked just now");
         else checked = tr("Checked %1 ago").arg(age < 3600    ? QStringLiteral("%1m").arg(age / 60)
                                                 : age < 86400 ? QStringLiteral("%1h").arg(age / 3600)
                                                               : QStringLiteral("%1d").arg(age / 86400));
     }
     ui->vServiceChecked->setText(checked);
-    ui->vServiceChecked->setToolTip(details);
     ui->vServiceChecked->setVisible(!checked.isEmpty());
 
     // The runner skips auto selectors, so the button would do nothing for one.

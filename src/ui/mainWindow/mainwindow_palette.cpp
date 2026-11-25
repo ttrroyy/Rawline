@@ -74,8 +74,7 @@ void MainWindow::fillPaletteSettings() {
         // Running a parked entry switches to Advanced first, so it opens where the full layout puts it.
         const QString &where = simple && !entry.advanced ? item.simplePath : item.path;
         entry.path = where.isEmpty() ? title : title + " › " + where;
-        entry.run = [this, opener, item, advanced = entry.advanced] {
-            if (advanced && UiMode::Simple()) setSimpleMode(false);
+        entry.run = [this, opener, item] {
             opener->trigger();
             revealSetting(item);
         };
@@ -119,17 +118,7 @@ void MainWindow::setDialogInUse(bool inUse) {
 void MainWindow::applyUiMode() {
     UiMode::Apply(this);
     UiMode::Apply(trayMenu);
-    ui->actionAdvanced_Mode->setChecked(!UiMode::Simple());
     if (commandPalette) fillPaletteSettings();
-}
-
-void MainWindow::setSimpleMode(bool simple) {
-    auto &settings = Configs::dataManager->settingsRepo;
-    if (settings->simple_mode != simple) {
-        settings->simple_mode = simple;
-        settings->Save();
-    }
-    applyUiMode();
 }
 
 void MainWindow::revealSetting(const SettingsIndex::Item &item) {

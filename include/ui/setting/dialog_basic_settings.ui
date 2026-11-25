@@ -1037,39 +1037,6 @@
               </property>
              </widget>
             </item>
-            <item row="1" column="0">
-             <widget class="QLabel" name="ui_mode_l">
-              <property name="sizePolicy">
-               <sizepolicy hsizetype="Maximum" vsizetype="Maximum">
-                <horstretch>0</horstretch>
-                <verstretch>0</verstretch>
-               </sizepolicy>
-              </property>
-              <property name="toolTip">
-               <string>Simple hides the advanced options. They keep their values and still apply.</string>
-              </property>
-              <property name="text">
-               <string>Interface</string>
-              </property>
-              <property name="buddy">
-               <cstring>ui_mode</cstring>
-              </property>
-             </widget>
-            </item>
-            <item row="1" column="2">
-             <widget class="QComboBox" name="ui_mode">
-              <item>
-               <property name="text">
-                <string>Simple</string>
-               </property>
-              </item>
-              <item>
-               <property name="text">
-                <string>Advanced</string>
-               </property>
-              </item>
-             </widget>
-            </item>
            </layout>
           </widget>
          </item>

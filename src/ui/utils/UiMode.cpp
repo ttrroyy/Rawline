@@ -124,7 +124,7 @@ namespace UiMode {
     }
 
     bool Simple() {
-        return Configs::dataManager != nullptr && Configs::dataManager->settingsRepo->simple_mode;
+        return false;
     }
 
     bool IsAdvanced(const QObject *object) {

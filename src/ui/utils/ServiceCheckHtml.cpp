@@ -1,6 +1,11 @@
 #include "include/ui/utils/ServiceCheckHtml.h"
 
 #include <QDateTime>
+#include <QDialog>
+#include <QDialogButtonBox>
+#include <QScreen>
+#include <QTextBrowser>
+#include <QVBoxLayout>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -8,6 +13,8 @@
 #include <QSet>
 
 #include "include/database/entities/Profile.h"
+#include "include/database/DatabaseManager.h"
+#include "include/database/ProfilesRepo.h"
 #include "include/ui/setting/ThemeManager.hpp"
 
 namespace {
@@ -164,5 +171,32 @@ namespace ServiceCheckHtml {
             }
         }
         return html + QStringLiteral("</table></qt>");
+    }
+
+    void showReport(QWidget *parent, const QList<int> &ids, qint64 startedAt) {
+        QStringList sections;
+        for (int id : ids) {
+            const auto profile = Configs::dataManager->profilesRepo->GetProfile(id);
+            if (!profile || !profile->outbound || profile->ServiceCheckedAt() < startedAt) continue;
+            const auto report = details(*profile);
+            if (report.isEmpty()) continue;
+            sections << QStringLiteral("<h3>%1</h3>%2")
+                            .arg(profile->outbound->name.toHtmlEscaped(), report.mid(4, report.size() - 9));
+        }
+
+        if (sections.isEmpty()) return;
+        auto *window = new QDialog(parent);
+        window->setAttribute(Qt::WA_DeleteOnClose);
+        window->setWindowTitle(QObject::tr("Service Check"));
+        auto *layout = new QVBoxLayout(window);
+        auto *text = new QTextBrowser(window);
+        text->setHtml(sections.join(QStringLiteral("<hr>")));
+        layout->addWidget(text);
+        auto *buttons = new QDialogButtonBox(QDialogButtonBox::Close, window);
+        QObject::connect(buttons, &QDialogButtonBox::rejected, window, &QDialog::reject);
+        layout->addWidget(buttons);
+        const auto *screen = parent->screen();
+        window->resize(QSize(620, 540).boundedTo(screen->availableGeometry().size() - QSize(24, 48)));
+        window->show();
     }
 }

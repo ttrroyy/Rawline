@@ -11,12 +11,6 @@ void MainWindow::on_menu_scanner_triggered() {
     showScannerDialog();
 }
 
-void MainWindow::on_menu_find_settings_triggered() {
-    const auto selected = get_now_selected_list();
-    if (selected.size() != 1) return;
-    ScannerUi::FindSettings(selected.first());
-}
-
 void MainWindow::showScannerDialog() {
     if (m_scannerDialog == nullptr) {
         m_scannerDialog = new DialogScanner(this);

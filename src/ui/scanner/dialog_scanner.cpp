@@ -90,6 +90,8 @@ void DialogScanner::syncWatched() {
 
 void DialogScanner::reloadScans() {
     scans = Configs::dataManager->ipScansRepo->GetAllIpScans();
+    // Keep old scan records readable by previous versions without exposing the removed scan type.
+    scans.removeIf([](const auto &scan) { return scan->kind == Configs::IpScan::Kind::Retired; });
 
     const int scroll = ui->scan_list->verticalScrollBar() ? ui->scan_list->verticalScrollBar()->value() : 0;
     ui->scan_list->clear();
@@ -156,17 +158,13 @@ void DialogScanner::deleteScan(int scanId) {
     QMessageBox box(QMessageBox::Question, tr("Confirmation"), tr("Delete the scan \"%1\"?").arg(scan->name),
                     QMessageBox::Yes | QMessageBox::No, this);
     box.setTextFormat(Qt::PlainText);
-    // A settings search keeps its trials in the scan row, so it has no result list.
-    QCheckBox *alsoResults = nullptr;
-    if (scan->kind != Configs::IpScan::Kind::Tune) {
-        alsoResults = new QCheckBox(tr("Also delete its result list"), &box);
-        box.setCheckBox(alsoResults);
-    }
+    auto *alsoResults = new QCheckBox(tr("Also delete its result list"), &box);
+    box.setCheckBox(alsoResults);
     box.setDefaultButton(QMessageBox::No);
     box.exec();
     if (box.clickedButton() != box.button(QMessageBox::Yes)) return;
 
-    const auto error = Scanner::ScanManager::instance()->DeleteScan(scanId, alsoResults != nullptr && alsoResults->isChecked());
+    const auto error = Scanner::ScanManager::instance()->DeleteScan(scanId, alsoResults->isChecked());
     if (!error.isEmpty()) {
         MessageBoxWarning(tr("IP Scanner"), error);
         return;
