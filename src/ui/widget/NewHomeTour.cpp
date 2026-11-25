@@ -576,6 +576,17 @@ void NewHome::runTour(MainWindow *mw, const QString &dir) {
                 QApplication::processEvents();
                 check(settings.isVisible() && hasCaption(settings.winId()) && hasCaption(mainId) && mw->winId() == mainId,
                       "System lost its native frame while settings remained open");
+                using DwmGetAttribute = HRESULT(WINAPI *)(HWND, DWORD, PVOID, DWORD);
+                const HMODULE dwm = GetModuleHandleW(L"dwmapi.dll");
+                const auto getDwmAttribute = dwm
+                    ? reinterpret_cast<DwmGetAttribute>(GetProcAddress(dwm, "DwmGetWindowAttribute")) : nullptr;
+                BOOL mainComposed = FALSE, dialogComposed = FALSE;
+                if (getDwmAttribute && SUCCEEDED(getDwmAttribute(reinterpret_cast<HWND>(mainId),
+                    1 /* DWMWA_NCRENDERING_ENABLED */, &mainComposed, sizeof mainComposed)) && mainComposed) {
+                    check(SUCCEEDED(getDwmAttribute(reinterpret_cast<HWND>(settings.winId()),
+                          1 /* DWMWA_NCRENDERING_ENABLED */, &dialogComposed, sizeof dialogComposed)) && dialogComposed,
+                          "System settings fell back to classic GDI while the main window used DWM");
+                }
                 check(mw->centralWidget()->autoFillBackground() && mw->mask().isEmpty(), "classic background is not opaque");
                 check(mw->centralWidget()->palette().color(QPalette::Window) == qApp->palette().color(QPalette::Window),
                       "Rawline background survived the switch to System");

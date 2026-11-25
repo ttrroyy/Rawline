@@ -354,9 +354,9 @@ namespace {
             window->setProperty("rawlineSavedCaptionBits", QVariant());
         }
         if (newStyle != oldStyle) SetWindowLongPtrW(hwnd, GWL_STYLE, newStyle);
-        NewStyle::themeFrame(window);
         SetWindowPos(hwnd, nullptr, 0, 0, 0, 0,
                      SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+        NewStyle::themeFrame(window);
     }
 
     void clipNativeFrame(QWidget *window, HWND hwnd, bool themed) {
@@ -719,11 +719,6 @@ void NewStyle::themeFrame(QWidget *window) {
     const bool themed = active();
     clipNativeFrame(window, hwnd, themed);
     if (!set) return;
-    if (qobject_cast<MainWindow *>(window) || qobject_cast<QDialog *>(window)) {
-        // Let DWM paint the system frame again when leaving a Rawline theme.
-        const DWORD policy = themed && (qobject_cast<MainWindow *>(window) || window->property("newFrame").toBool()) ? 1 : 0;
-        set(hwnd, 2 /* DWMWA_NCRENDERING_POLICY */, &policy, sizeof policy);
-    }
     const BOOL dark = themed ? !light() : qApp->palette().color(QPalette::Window).lightness() < 128;
     set(hwnd, 20 /* DWMWA_USE_IMMERSIVE_DARK_MODE */, &dark, sizeof dark);
     // Windows 11 paints the caption in the theme's own ground and ink; older systems ignore these.
