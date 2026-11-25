@@ -574,6 +574,7 @@ bool TestRunner::runServiceSession(const QList<int>& requestedIDs, bool testCurr
     interactive_.store(interactive);
 
     runOnNewThread([this, profileIDs, testCurrent, finish] {
+        runOnUiThread([this, profileIDs] { observer_->testStateChanged(profileIDs, 3); });
         observer_->testPanelSeeded(TestKind::Service, profileIDs.size());
         observer_->testViewChanged(true);
 
@@ -629,6 +630,7 @@ bool TestRunner::runServiceSession(const QList<int>& requestedIDs, bool testCurr
 
         observer_->testPanelsCleared();
         observer_->testViewChanged(true);
+        runOnUiThread([this, profileIDs] { observer_->testStateChanged(profileIDs, 0); });
         gate_.finishSpeed();
         finish();
         if (definitions->error.isEmpty()) MW_show_log(MainWindowTr::tr("Service check finished!"));

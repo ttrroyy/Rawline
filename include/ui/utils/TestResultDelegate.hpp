@@ -1,5 +1,6 @@
 #pragma once
 #include "include/ui/utils/ProfilesTableModel.h"
+#include "include/ui/widget/NewHome.hpp"
 #include <QStyledItemDelegate>
 #include <QStyleOptionViewItem>
 #include <QStyle>
@@ -39,6 +40,9 @@ public:
             const qint64 since = index.data(ProfilesTableModel::TestSinceRole).toLongLong();
             const qint64 spun = since > 0 ? QDateTime::currentMSecsSinceEpoch() - since : clock.elapsed();
             painter->drawArc(box.adjusted(1,1,-1,-1), -int(spun%1000)*5760/1000, 250*16);
+        } else if (state == 3) {
+            const auto started = index.data(ProfilesTableModel::TestSinceRole).toLongLong();
+            NewStyle::paintServiceCheck(*painter, box, color, qMax<qint64>(0, QDateTime::currentMSecsSinceEpoch() - started));
         } else {
             painter->drawArc(box.adjusted(1,1,-1,-1), -45*16, 270*16);
             const QPointF center=box.center();

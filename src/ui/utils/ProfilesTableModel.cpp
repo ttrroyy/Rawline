@@ -23,7 +23,7 @@ ProfilesTableModel::ProfilesTableModel(QObject *parent)
 
 void ProfilesTableModel::setTestState(const QList<int> &ids, int state, const QString &country, const QString &text) {
     for (int id : ids) {
-        if (state == 1 && testStates.value(id).first != 1) testSince[id] = QDateTime::currentMSecsSinceEpoch();
+        if ((state == 1 || state == 3) && testStates.value(id).first != state) testSince[id] = QDateTime::currentMSecsSinceEpoch();
         if (state) { testStates[id] = {state, country}; testProgressText[id] = text; }
         else { testStates.remove(id); testProgressText.remove(id); testSince.remove(id); }
         refreshProfileId(id);

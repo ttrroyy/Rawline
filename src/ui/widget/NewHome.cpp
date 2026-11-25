@@ -1092,6 +1092,15 @@ void NewStyle::paintIcon(QPainter &p, const QString &name, const QRectF &box, co
     p.restore();
 }
 
+void NewStyle::paintServiceCheck(QPainter &p, const QRectF &box, const QColor &ink, qint64 elapsed) {
+    const auto y = box.top() + box.height() * ((elapsed % 1000) / 625.0 - .3);
+    paintIcon(p, QStringLiteral("serviceCheck"), box, withAlpha(ink, 160));
+    p.save();
+    p.setClipRect(QRectF(box.left(), y - box.height() * .14, box.width(), box.height() * .28), Qt::IntersectClip);
+    paintIcon(p, QStringLiteral("serviceCheck"), box, ink);
+    p.restore();
+}
+
 QIcon NewStyle::icon(const QString &name, const QColor &color) {
     QIcon result;
     for (const int size : {16, 24, 32, 48}) {
@@ -1872,8 +1881,16 @@ void NewProfileDelegate::paint(QPainter *p, const QStyleOptionViewItem &option, 
     const int testState = index.siblingAtColumn(ProfilesTableModel::ColTestResult).data(ProfilesTableModel::TestStateRole).toInt();
     const bool measuring = testState == 2 && index.siblingAtColumn(ProfilesTableModel::ColTestResult).data(ProfilesTableModel::TestCountryRole).toString().isEmpty();
     p->setFont(NewStyle::font(12));
+    const bool serviceCheck = testState == 3;
     const int resultWidth = testState == 1 || measuring ? 38 : result.isEmpty() ? 0 : std::clamp(p->fontMetrics().horizontalAdvance(result) + 8, 0, 200);
+    const int markerWidth = serviceCheck ? 24 : 0;
     QRectF resultBox(chevron.left() - resultWidth, row.center().y() - 16, resultWidth, 32);
+    if (serviceCheck) {
+        const QRectF mark(resultBox.left() - markerWidth, row.center().y() - 12, 24, 24);
+        const auto started = index.siblingAtColumn(ProfilesTableModel::ColTestResult)
+                                 .data(ProfilesTableModel::TestSinceRole).toLongLong();
+        NewStyle::paintServiceCheck(*p, mark, ink, std::max<qint64>(0, QDateTime::currentMSecsSinceEpoch() - started));
+    }
     if (testState == 1) {
         p->setPen(QPen(ink, 2, Qt::SolidLine, Qt::RoundCap));
         p->setBrush(Qt::NoBrush);
@@ -1906,7 +1923,7 @@ void NewProfileDelegate::paint(QPainter *p, const QStyleOptionViewItem &option, 
         p->drawEllipse(c, 2, 2);
     }
     const qreal textLeft = badge.right() + 10;
-    qreal textRight = resultBox.left() - 4;
+    qreal textRight = resultBox.left() - markerWidth - 4;
     if (index.data(ProfilesTableModel::PinnedRole).toBool()) {
         NewStyle::paintIcon(*p, QStringLiteral("pin"), QRectF(textRight - 16, row.center().y() - 8, 16, 16), dim);
         textRight -= 20;

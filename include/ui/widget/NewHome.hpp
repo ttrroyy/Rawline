@@ -62,6 +62,7 @@ namespace NewStyle {
     // A translucent body, lighter at the top, with one thin rim; tinted for the chosen row or action.
     void paintGlass(QPainter &p, const QRectF &r, qreal radius, const QColor &tint = QColor());
     void paintIcon(QPainter &p, const QString &name, const QRectF &box, const QColor &color);
+    void paintServiceCheck(QPainter &p, const QRectF &box, const QColor &ink, qint64 elapsed);
     QIcon icon(const QString &name, const QColor &color);
     // Same first-flag rule as the mobile server list. Changes only the displayed name.
     QString takeProfileFlag(QString &name);

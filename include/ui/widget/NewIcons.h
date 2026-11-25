@@ -19,6 +19,9 @@ inline const NewIconPath newIcon_chevron[] = {
 inline const NewIconPath newIcon_refresh[] = {
     {"M20,7 L20,2 M20,7 L15,7 M4,17 L4,22 M4,17 L9,17 M20,7 C18.5,4 15.5,3 12,3 C7,3 3,7 3,12 M4,17 C5.5,20 8.5,21 12,21 C17,21 21,17 21,12", 1.7f},
 };
+inline const NewIconPath newIcon_serviceCheck[] = {
+    {"M14.5,4.5H5.5Q4.5,4.5 4.5,5.5V15.5Q4.5,16.5 5.5,16.5H15.5 M9.5,16.5V19.5M14.5,16.5V19.5M7.5,19.5H15.5 M15.5,4.5H19.5V10.5H15.5Z M15.5,6.5H19.5 M17.5,10.5V19.5", 1.0f},
+};
 inline const NewIconPath newIcon_test[] = {
     {"M4,19 C1.3,15.8 1.4,10.9 4.3,7.7 C8.6,3 15.4,3 19.7,7.7 C22.6,10.9 22.7,15.8 20,19 M12,15 L17,9", 1.7f},
 };
@@ -90,6 +93,7 @@ inline const NewIconData newIcons[] = {
     {"chevron", 24.f, newIcon_chevron, 1},
     {"refresh", 24.f, newIcon_refresh, 1},
     {"test", 24.f, newIcon_test, 1},
+    {"serviceCheck", 24.f, newIcon_serviceCheck, 1},
     {"globe", 24.f, newIcon_globe, 1},
     {"info", 24.f, newIcon_info, 1},
     {"tun", 24.f, newIcon_tun, 1},
