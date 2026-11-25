@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "revision": 2026112501,
+  "revision": 2026112502,
   "categories": [
     {"id": "ai", "name": "AI", "icon": "🤖"},
     {"id": "streaming", "name": "Streaming", "icon": "🎬"},
@@ -17,7 +17,7 @@
     {"id": "github_web", "name": "GitHub", "category": "web", "requests": [{"id": "web", "url": "https://github.com/", "method": "HEAD", "follow": false}], "rules": [{"if": [{"status": ["403"], "headers": {"Cf-Mitigated": "challenge"}}], "result": "unknown", "note": "Bot check"}, {"if": [{"status": ["451"]}], "result": "blocked"}, {"if": [{"status": ["403", "429"]}], "result": "partial", "note": "HTTP access refused or rate limited"}, {"if": [{"status": ["2xx", "3xx"]}], "result": "available", "note": "Web endpoint responds"}]},
     {"id": "twitch_web", "name": "Twitch", "category": "web", "requests": [{"id": "web", "url": "https://www.twitch.tv/", "method": "HEAD", "follow": false}], "rules": [{"if": [{"status": ["403"], "headers": {"Cf-Mitigated": "challenge"}}], "result": "unknown", "note": "Bot check"}, {"if": [{"status": ["451"]}], "result": "blocked"}, {"if": [{"status": ["403", "429"]}], "result": "partial", "note": "HTTP access refused or rate limited"}, {"if": [{"status": ["2xx", "3xx"]}], "result": "available", "note": "Web endpoint responds"}]},
     {"id": "wikipedia_reading", "name": "Wikipedia", "category": "web", "requests": [{"id": "web", "url": "https://en.wikipedia.org/", "method": "HEAD", "follow": false}], "rules": [{"if": [{"status": ["403"], "headers": {"Cf-Mitigated": "challenge"}}], "result": "unknown", "note": "Bot check"}, {"if": [{"status": ["451"]}], "result": "blocked"}, {"if": [{"status": ["403", "429"]}], "result": "partial", "note": "HTTP access refused or rate limited"}, {"if": [{"status": ["2xx", "3xx"]}], "result": "available", "note": "Web endpoint responds"}]},
-    {"id": "cloudflare_transfer", "name": "Cloudflare · 24 KiB", "category": "web", "requests": [{"id": "web", "url": "https://speed.cloudflare.com/__down?bytes=24576", "headers": {"Accept-Encoding": "identity"}, "max_body": 24576, "follow": false}], "rules": [{"if": [{"status": ["2xx"]}], "result": "available"}]},
+    {"id": "cloudflare_transfer", "name": "HTTPS transfer · Cloudflare", "category": "web", "requests": [{"id": "short", "url": "https://speed.cloudflare.com/__down?bytes=1024", "headers": {"Accept-Encoding": "identity"}, "max_body": 1024, "follow": false}, {"id": "long", "url": "https://speed.cloudflare.com/__down?bytes=24576", "headers": {"Accept-Encoding": "identity"}, "max_body": 24576, "follow": false}], "rules": [{"if": [{"status": ["2xx"], "request": "long"}], "result": "available"}]},
     {
       "id": "chatgpt",
       "name": "ChatGPT",

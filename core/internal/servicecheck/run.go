@@ -133,6 +133,16 @@ func Run(ctx context.Context, defs *Definitions, client *Client, opts Options) (
 		}
 		settle(answered, checkError)
 		outcome := check.Evaluate(responses)
+		if check.ID == "cloudflare_transfer" {
+			var repeated *Response
+			if check.shouldConfirmTransfer(responses) && ctx.Err() == nil {
+				// A fresh TCP/TLS session distinguishes repeated short reads from a single broken HTTP/2 stream.
+				retry := client.newSession()
+				repeated = retry.fetch(ctx, check.Requests[1])
+				retry.close()
+			}
+			outcome = check.transferOutcome(responses, repeated)
+		}
 		outcomes[idx] = &outcome
 	}
 

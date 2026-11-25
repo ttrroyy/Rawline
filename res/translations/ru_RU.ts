@@ -13726,8 +13726,20 @@ Release note:
         <translation>Соединение прервано</translation>
     </message>
     <message>
-        <source>Transfer interrupted at 16–20 KiB (possible DPI)</source>
-        <translation>Обрыв на 16–20 КиБ (возможен DPI)</translation>
+        <source>Transfer interrupted at 16–20 KiB</source>
+        <translation>Обрыв на 16–20 КиБ</translation>
+    </message>
+    <message>
+        <source>Likely DPI filtering</source>
+        <translation>Вероятная фильтрация DPI</translation>
+    </message>
+    <message>
+        <source>1 KiB control passed. Two larger replies stopped after %1 and %2 bytes.</source>
+        <translation>Контрольный ответ в 1 КиБ получен. Две большие загрузки прервались после %1 и %2 байт.</translation>
+    </message>
+    <message>
+        <source>Received %1 of %2 bytes.</source>
+        <translation>Получено %1 из %2 байт.</translation>
     </message>
 </context>
 <context>

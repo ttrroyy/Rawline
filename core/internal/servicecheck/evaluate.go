@@ -65,7 +65,11 @@ func (c *Check) fallback(responses []*Response) (string, string) {
 			continue
 		}
 		if r.Err != nil {
-			return classifyFailure(r), shortError(r.Err)
+			status := classifyFailure(r)
+			if status == StatusShortBody {
+				return status, fmt.Sprintf("%d of %s bytes received", len(r.Body), r.Header.Get("Content-Length"))
+			}
+			return status, shortError(r.Err)
 		}
 		last = r
 	}
@@ -73,6 +77,43 @@ func (c *Check) fallback(responses []*Response) (string, string) {
 		return StatusFailed, "not run"
 	}
 	return StatusUnknown, "unexpected response (HTTP " + strconv.Itoa(last.Status) + ")"
+}
+
+// The short control must work before retrying the interrupted long download.
+func (c *Check) shouldConfirmTransfer(responses []*Response) bool {
+	return c.ID == "cloudflare_transfer" && len(responses) == 2 &&
+		completeTransfer(responses[0], 1024) && responses[1] != nil && classifyFailure(responses[1]) == StatusShortBody
+}
+
+func completeTransfer(r *Response, expected int) bool {
+	return r != nil && r.Err == nil && r.Status >= 200 && r.Status < 300 && len(r.Body) == expected
+}
+
+func (c *Check) transferOutcome(responses []*Response, repeated *Response) Outcome {
+	out := c.Evaluate(responses)
+	if len(responses) != 2 {
+		return out
+	}
+	short, long := responses[0], responses[1]
+	if completeTransfer(short, 1024) && completeTransfer(long, 24576) {
+		out.Status, out.Note = StatusAvailable, "1024 and 24576 bytes received"
+		return out
+	}
+	if out.Status == StatusAvailable {
+		out.Status, out.Note = StatusUnknown, "The control response did not match the expected size"
+	}
+	if repeated == nil || !c.shouldConfirmTransfer(responses) {
+		return out
+	}
+	if completeTransfer(repeated, 24576) {
+		out.Status, out.Note = StatusInterrupted, fmt.Sprintf("%d bytes before interruption; retry received 24576 bytes", len(long.Body))
+		return out
+	}
+	if classifyFailure(repeated) == StatusShortBody {
+		out.Status = StatusFilterPattern
+		out.Note = fmt.Sprintf("1024-byte control passed; long replies stopped at %d and %d bytes", len(long.Body), len(repeated.Body))
+	}
+	return out
 }
 
 type tlsHandshakeError struct{ error }

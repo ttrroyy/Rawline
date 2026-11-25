@@ -44,22 +44,23 @@ const (
 )
 
 const (
-	StatusAvailable   = "available"
-	StatusPartial     = "partial"
-	StatusRestricted  = "restricted"
-	StatusBlocked     = "blocked"
-	StatusUnknown     = "unknown"
-	StatusFailed      = "failed"
-	StatusDNSFailure  = "dns_failure"
-	StatusTLSFailure  = "tls_failure"
-	StatusInterrupted = "interrupted"
-	StatusShortBody   = "short_body"
+	StatusAvailable     = "available"
+	StatusPartial       = "partial"
+	StatusRestricted    = "restricted"
+	StatusBlocked       = "blocked"
+	StatusUnknown       = "unknown"
+	StatusFailed        = "failed"
+	StatusDNSFailure    = "dns_failure"
+	StatusTLSFailure    = "tls_failure"
+	StatusInterrupted   = "interrupted"
+	StatusShortBody     = "short_body"
+	StatusFilterPattern = "filter_pattern"
 )
 
 var validStatuses = map[string]bool{
 	StatusAvailable: true, StatusPartial: true, StatusRestricted: true,
 	StatusBlocked: true, StatusUnknown: true, StatusFailed: true,
-	StatusDNSFailure: true, StatusTLSFailure: true, StatusInterrupted: true, StatusShortBody: true,
+	StatusDNSFailure: true, StatusTLSFailure: true, StatusInterrupted: true, StatusShortBody: true, StatusFilterPattern: true,
 }
 
 type Definitions struct {

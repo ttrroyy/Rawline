@@ -43,3 +43,28 @@ func TestExpandedDefaultCatalog(t *testing.T) {
 		}
 	}
 }
+
+func TestTransferPatternNeedsAWorkingControlAndTwoPartialReplies(t *testing.T) {
+	check := &Check{ID: "cloudflare_transfer"}
+	short := &Response{Status: 200, Body: make([]byte, 1024)}
+	complete := &Response{Status: 200, Body: make([]byte, 24576)}
+	interrupted := &Response{Status: 200, Header: http.Header{"Content-Length": {"24576"}}, Body: make([]byte, 18432), Err: io.ErrUnexpectedEOF}
+	for _, test := range []struct {
+		name                  string
+		first, second, repeat *Response
+		want                  string
+	}{
+		{"healthy", short, complete, nil, StatusAvailable},
+		{"single interruption", short, interrupted, nil, StatusShortBody},
+		{"transient interruption", short, interrupted, complete, StatusInterrupted},
+		{"repeated near threshold", short, interrupted, interrupted, StatusFilterPattern},
+		{"missing control", nil, interrupted, interrupted, StatusShortBody},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			got := check.transferOutcome([]*Response{test.first, test.second}, test.repeat)
+			if got.Status != test.want {
+				t.Fatalf("status = %q, want %q", got.Status, test.want)
+			}
+		})
+	}
+}
