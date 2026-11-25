@@ -583,8 +583,14 @@ void NewHome::runTour(MainWindow *mw, const QString &dir) {
                 BOOL mainComposed = FALSE, dialogComposed = FALSE;
                 if (getDwmAttribute && SUCCEEDED(getDwmAttribute(reinterpret_cast<HWND>(mainId),
                     1 /* DWMWA_NCRENDERING_ENABLED */, &mainComposed, sizeof mainComposed)) && mainComposed) {
-                    check(SUCCEEDED(getDwmAttribute(reinterpret_cast<HWND>(settings.winId()),
-                          1 /* DWMWA_NCRENDERING_ENABLED */, &dialogComposed, sizeof dialogComposed)) && dialogComposed,
+                    const auto hwnd = reinterpret_cast<HWND>(settings.winId());
+                    const auto result = getDwmAttribute(hwnd, 1 /* DWMWA_NCRENDERING_ENABLED */,
+                                                       &dialogComposed, sizeof dialogComposed);
+                    if (FAILED(result) || !dialogComposed)
+                        qWarning() << "System settings native frame:" << Qt::hex << result
+                                   << GetWindowLongPtrW(hwnd, GWL_STYLE) << GetWindowLongPtrW(hwnd, GWL_EXSTYLE)
+                                   << hasRoundedRegion(settings.winId());
+                    check(SUCCEEDED(result) && dialogComposed,
                           "System settings fell back to classic GDI while the main window used DWM");
                 }
                 check(mw->centralWidget()->autoFillBackground() && mw->mask().isEmpty(), "classic background is not opaque");

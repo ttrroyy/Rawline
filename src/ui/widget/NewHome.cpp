@@ -333,6 +333,8 @@ namespace {
         return true;
     }
 
+    void clipNativeFrame(QWidget *window, HWND hwnd, bool themed);
+
     void recalculateWindowsFrame(QWidget *window) {
         const auto id = window->internalWinId();
         if (!id) return;
@@ -353,6 +355,7 @@ namespace {
             window->setProperty("rawlineSavedCaptionWindow", QVariant());
             window->setProperty("rawlineSavedCaptionBits", QVariant());
         }
+        if (!NewStyle::active()) clipNativeFrame(window, hwnd, false);
         if (newStyle != oldStyle) SetWindowLongPtrW(hwnd, GWL_STYLE, newStyle);
         if (NewStyle::active() || savedWindow == quint64(id)) {
             using SetAttribute = HRESULT(WINAPI *)(HWND, DWORD, LPCVOID, DWORD);
@@ -368,6 +371,7 @@ namespace {
         SetWindowPos(hwnd, nullptr, 0, 0, 0, 0,
                      SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
         NewStyle::themeFrame(window);
+        if (!NewStyle::active()) RedrawWindow(hwnd, nullptr, nullptr, RDW_INVALIDATE | RDW_FRAME);
     }
 
     void clipNativeFrame(QWidget *window, HWND hwnd, bool themed) {
