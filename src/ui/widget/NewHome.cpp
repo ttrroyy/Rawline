@@ -357,20 +357,18 @@ namespace {
         }
         if (!NewStyle::active()) clipNativeFrame(window, hwnd, false);
         if (newStyle != oldStyle) SetWindowLongPtrW(hwnd, GWL_STYLE, newStyle);
-        if (NewStyle::active() || savedWindow == quint64(id)) {
-            using SetAttribute = HRESULT(WINAPI *)(HWND, DWORD, LPCVOID, DWORD);
-            static const auto set = [] {
-                const HMODULE dwm = LoadLibraryW(L"dwmapi.dll");
-                return dwm ? reinterpret_cast<SetAttribute>(GetProcAddress(dwm, "DwmSetWindowAttribute")) : nullptr;
+        if (!NewStyle::active() && savedWindow == quint64(id)) {
+            using SetTheme = HRESULT(WINAPI *)(HWND, LPCWSTR, LPCWSTR);
+            static const auto resetTheme = [] {
+                const HMODULE uxTheme = LoadLibraryW(L"uxtheme.dll");
+                return uxTheme ? reinterpret_cast<SetTheme>(GetProcAddress(uxTheme, "SetWindowTheme")) : nullptr;
             }();
-            // The same HWND retains its former rendering mode across a style change.
-            // Explicitly give the system caption back to DWM before recalculating the frame.
-            const DWORD policy = NewStyle::active() ? 1 /* DWMNCRP_DISABLED */ : 2 /* DWMNCRP_ENABLED */;
-            if (set) set(hwnd, 2 /* DWMWA_NCRENDERING_POLICY */, &policy, sizeof policy);
+            // Rebind the restored caption to the user's current visual style on the same HWND.
+            if (resetTheme) resetTheme(hwnd, nullptr, nullptr);
         }
+        NewStyle::themeFrame(window);
         SetWindowPos(hwnd, nullptr, 0, 0, 0, 0,
                      SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
-        NewStyle::themeFrame(window);
         if (!NewStyle::active()) RedrawWindow(hwnd, nullptr, nullptr, RDW_INVALIDATE | RDW_FRAME);
     }
 
@@ -739,10 +737,10 @@ void NewStyle::themeFrame(QWidget *window) {
     const bool themed = active();
     clipNativeFrame(window, hwnd, themed);
     if (!set) return;
-    if (!themed) {
-        const DWORD policy = 2; // DWMNCRP_ENABLED
-        set(hwnd, 2 /* DWMWA_NCRENDERING_POLICY */, &policy, sizeof policy);
-    }
+    // The custom frame is already captionless. Disabling DWM can leave a GDI caption
+    // when the same window regains WS_CAPTION, so follow the current window style.
+    const DWORD policy = 0; // DWMNCRP_USEWINDOWSTYLE
+    set(hwnd, 2 /* DWMWA_NCRENDERING_POLICY */, &policy, sizeof policy);
     const BOOL dark = themed ? !light() : qApp->palette().color(QPalette::Window).lightness() < 128;
     set(hwnd, 20 /* DWMWA_USE_IMMERSIVE_DARK_MODE */, &dark, sizeof dark);
     // Windows 11 paints the caption in the theme's own ground and ink; older systems ignore these.

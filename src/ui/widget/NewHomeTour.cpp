@@ -582,18 +582,23 @@ void NewHome::runTour(MainWindow *mw, const QString &dir) {
                 const HMODULE dwm = GetModuleHandleW(L"dwmapi.dll");
                 const auto getDwmAttribute = dwm
                     ? reinterpret_cast<DwmGetAttribute>(GetProcAddress(dwm, "DwmGetWindowAttribute")) : nullptr;
-                BOOL mainComposed = FALSE, dialogComposed = FALSE;
-                if (getDwmAttribute && SUCCEEDED(getDwmAttribute(reinterpret_cast<HWND>(mainId),
-                    1 /* DWMWA_NCRENDERING_ENABLED */, &mainComposed, sizeof mainComposed)) && mainComposed) {
-                    const auto hwnd = reinterpret_cast<HWND>(settings.winId());
-                    const auto result = getDwmAttribute(hwnd, 1 /* DWMWA_NCRENDERING_ENABLED */,
-                                                       &dialogComposed, sizeof dialogComposed);
-                    if (FAILED(result) || !dialogComposed)
-                        qWarning() << "System settings native frame:" << Qt::hex << result
-                                   << GetWindowLongPtrW(hwnd, GWL_STYLE) << GetWindowLongPtrW(hwnd, GWL_EXSTYLE)
-                                   << hasRoundedRegion(settings.winId());
-                    check(SUCCEEDED(result) && dialogComposed,
-                          "System settings fell back to classic GDI while the main window used DWM");
+                if (getDwmAttribute) {
+                    const auto hasComposedCaption = [&](WId id) {
+                        BOOL enabled = FALSE;
+                        return SUCCEEDED(getDwmAttribute(reinterpret_cast<HWND>(id),
+                            1 /* DWMWA_NCRENDERING_ENABLED */, &enabled, sizeof enabled)) && enabled;
+                    };
+                    // Compare with a fresh system window so a fallback in both existing windows still fails.
+                    QWidget freshWindow;
+                    freshWindow.setAttribute(Qt::WA_ShowWithoutActivating);
+                    freshWindow.show();
+                    QApplication::processEvents();
+                    const bool expectsComposedCaption = hasComposedCaption(freshWindow.winId());
+                    freshWindow.hide();
+                    if (expectsComposedCaption) {
+                        check(hasComposedCaption(mainId), "System main window fell back to a GDI caption");
+                        check(hasComposedCaption(settings.winId()), "System settings fell back to a GDI caption");
+                    }
                 }
                 check(mw->centralWidget()->autoFillBackground() && mw->mask().isEmpty(), "classic background is not opaque");
                 check(mw->centralWidget()->palette().color(QPalette::Window) == qApp->palette().color(QPalette::Window),

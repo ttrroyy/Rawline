@@ -802,8 +802,6 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWi
     });
     ui->menu_server->setCursor(Qt::PointingHandCursor);
     connect(ui->menu_server, &QMenu::aboutToShow, this, [=,this](){
-        ui->actionService_Check_Selected->setIcon(NewStyle::icon(
-            QStringLiteral("serviceCheck"), ui->menu_server->palette().color(QPalette::Text)));
         const auto pinSelected = get_now_selected_list();
         const auto pinnedIds = Configs::dataManager->settingsRepo->pinned_profiles.split(',', Qt::SkipEmptyParts);
         pinAction->setEnabled(!pinSelected.empty());
