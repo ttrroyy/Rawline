@@ -204,17 +204,15 @@ namespace {
         return nullptr;
     }
 
-    // In the new style every control that acts gets the system's pointing hand; the classic one keeps the arrow.
     void giveHand(QWidget *widget) {
         // A list's own rows ignore the sheet and draw a square frame; styled rows follow it.
-        if (auto *combo = qobject_cast<QComboBox *>(widget); combo && combo->itemDelegate()->inherits("QComboBoxDelegate")) {
+        if (auto *combo = qobject_cast<QComboBox *>(widget); NewStyle::active() && combo && combo->itemDelegate()->inherits("QComboBoxDelegate")) {
             combo->setItemDelegate(new QStyledItemDelegate(combo));
         }
         if (widget->testAttribute(Qt::WA_SetCursor)) return;
         if (qobject_cast<QAbstractButton *>(widget) || qobject_cast<QComboBox *>(widget) || qobject_cast<QTabBar *>(widget) ||
             qobject_cast<QMenu *>(widget) || qobject_cast<QMenuBar *>(widget) || qobject_cast<QSlider *>(widget)) {
             widget->setCursor(Qt::PointingHandCursor);
-            widget->setProperty("newHand", true);
         }
     }
 
@@ -512,6 +510,7 @@ namespace {
                     clipNativeFrame(widget, reinterpret_cast<HWND>(widget->internalWinId()), usesCustomWindowsCaption(widget));
             }
 #endif
+            if (event->type() == QEvent::Polish) giveHand(widget);
             if (!NewStyle::active()) return false;
             if ((event->type() == QEvent::Show || event->type() == QEvent::Resize) && widget->isWindow() && qobject_cast<QMenu *>(widget)) {
                 // QMenu sizes to its actions after its initial window events.
@@ -570,7 +569,6 @@ namespace {
                 const auto reason = static_cast<QFocusEvent *>(event)->reason();
                 g_keyFocus = reason == Qt::TabFocusReason || reason == Qt::BacktabFocusReason || reason == Qt::ShortcutFocusReason;
             } else if (event->type() == QEvent::Polish) {
-                giveHand(widget);
                 if (auto *dialog = qobject_cast<QDialog *>(watched); dialog && dialog->isWindow()) frameDialog(dialog);
             } else if (event->type() == QEvent::Show && widget->isWindow() &&
                        (widget->inherits("QComboBoxPrivateContainer") || widget->inherits("QTipLabel"))) {
@@ -773,7 +771,8 @@ bool NewStyle::isTheme(const QString &theme) {
 
 void NewStyle::setTheme(const QString &theme) {
     static MenuCorners *corners = nullptr;
-    if (!corners) {
+    const bool firstTheme = !corners;
+    if (firstTheme) {
         corners = new MenuCorners(qApp);
         qApp->installEventFilter(corners);
 #ifdef Q_OS_WIN
@@ -785,10 +784,9 @@ void NewStyle::setTheme(const QString &theme) {
     // Restoring a visible dialog sends Show synchronously; it must already see the incoming theme.
     g_theme = theme;
     if (leaving) {
-        // Back in the classic look: menus get their own background again, and every control its own cursor.
+        // Back in the classic look: menus get their own background again.
         for (auto *widget : QApplication::allWidgets()) {
             if (auto *menu = qobject_cast<QMenu *>(widget)) menu->clearMask();
-            if (widget->property("newHand").toBool()) { widget->unsetCursor(); widget->setProperty("newHand", QVariant()); }
             if (widget->property("newPopup").toBool()) { widget->setStyleSheet(QString()); widget->setProperty("newPopup", QVariant()); }
             // A dialog kept between uses gets its system frame back.
             if (widget->property("newFrame").toBool()) {
@@ -816,9 +814,9 @@ void NewStyle::setTheme(const QString &theme) {
         }
     }
     // Controls made before the switch are polished already.
-    if (entering) for (auto *widget : QApplication::allWidgets()) {
+    if (firstTheme || entering) for (auto *widget : QApplication::allWidgets()) {
         giveHand(widget);
-        if (auto *dialog = qobject_cast<QDialog *>(widget); dialog && dialog->isWindow()) frameDialog(dialog);
+        if (auto *dialog = qobject_cast<QDialog *>(widget); entering && dialog && dialog->isWindow()) frameDialog(dialog);
     }
 }
 
@@ -1603,22 +1601,34 @@ void NewOrb::paintEvent(QPaintEvent *) {
 // ---------------------------------------------------------------- window buttons
 
 namespace {
-    class WindowButton : public QAbstractButton {
+    class WindowButton : public QToolButton {
     public:
         enum Kind { Minimize, Maximize, Close };
-        WindowButton(Kind kind, QWidget *parent) : QAbstractButton(parent), m_kind(kind) {
+        WindowButton(Kind kind, QWidget *parent) : QToolButton(parent), m_kind(kind) {
             setFixedSize(40, 28);
             setAttribute(Qt::WA_Hover);
             setFocusPolicy(Qt::NoFocus);
         }
     protected:
-        void enterEvent(QEnterEvent *e) override { m_hover = true; update(); QAbstractButton::enterEvent(e); }
-        void leaveEvent(QEvent *e) override { m_hover = false; update(); QAbstractButton::leaveEvent(e); }
+        void enterEvent(QEnterEvent *e) override { m_hover = true; update(); QToolButton::enterEvent(e); }
+        void leaveEvent(QEvent *e) override { m_hover = false; update(); QToolButton::leaveEvent(e); }
         void paintEvent(QPaintEvent *) override {
             QPainter p(this);
+            if (!NewStyle::active()) {
+                QStyleOptionToolButton option;
+                initStyleOption(&option);
+                auto icon = QStyle::SP_TitleBarCloseButton;
+                if (m_kind == Minimize) icon = QStyle::SP_TitleBarMinButton;
+                if (m_kind == Maximize) {
+                    icon = window()->isMaximized() ? QStyle::SP_TitleBarNormalButton : QStyle::SP_TitleBarMaxButton;
+                }
+                option.icon = style()->standardIcon(icon, &option, this);
+                style()->drawComplexControl(QStyle::CC_ToolButton, &option, &p, this);
+                return;
+            }
             p.setRenderHint(QPainter::Antialiasing);
             const QRectF r = rect();
-            const QColor foreground = NewStyle::active() ? NewStyle::text() : palette().color(QPalette::WindowText);
+            const QColor foreground = NewStyle::text();
             const auto highlight = m_kind == Close ? QColor(220, 66, 61) : foreground;
             if (m_hover || isDown()) {
                 p.setPen(Qt::NoPen);
@@ -1781,8 +1791,8 @@ NewTitleBar::NewTitleBar(QWidget *parent) : QWidget(parent) {
     m_iconSlot->setObjectName(QStringLiteral("rawlineCaptionIcon"));
     m_iconSlot->setFixedSize(20, 20);
     m_title = new QLabel(this);
+    m_title->setObjectName(QStringLiteral("rawlineCaptionTitle"));
     m_title->setAlignment(Qt::AlignLeading | Qt::AlignVCenter);
-    m_title->setFont(NewStyle::font(12));
     m_title->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
     m_title->setAttribute(Qt::WA_TransparentForMouseEvents);
     m_iconSlot->setAttribute(Qt::WA_TransparentForMouseEvents);
@@ -1804,6 +1814,7 @@ NewTitleBar::NewTitleBar(QWidget *parent) : QWidget(parent) {
 }
 
 void NewTitleBar::follow(QWidget *window) {
+    m_title->setFont(NewStyle::active() ? NewStyle::font(12) : QFont());
     if (m_window == window) return;
     m_window = window;
     window->installEventFilter(this);
@@ -3661,8 +3672,9 @@ void MainWindow::applyInterfaceStyle(bool animated) {
     if (wantNew) framePalette.setColor(QPalette::Window, NewStyle::background());
     centralWidget()->setPalette(framePalette);
     centralWidget()->setAutoFillBackground(true);
-    centralWidget()->findChild<QWidget *>(QStringLiteral("rawlineMainCaption"), Qt::FindDirectChildrenOnly)
-        ->setVisible(usesCustomWindowsCaption(this));
+    auto *caption = static_cast<NewTitleBar *>(centralWidget()->findChild<QWidget *>(QStringLiteral("rawlineMainCaption"), Qt::FindDirectChildrenOnly));
+    caption->follow(this);
+    caption->setVisible(usesCustomWindowsCaption(this));
 #endif
     // The hidden page must not hold the window to its own minimum: the new one goes down to a phone's width.
     if (QWidget *classic = rootStack->widget(0)) {

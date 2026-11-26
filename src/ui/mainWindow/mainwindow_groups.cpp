@@ -141,15 +141,16 @@ void MainWindow::show_group(int gid) {
     Configs::dataManager->settingsRepo->refreshing_group = false;
 }
 
-void MainWindow::refresh_groups() {
+void MainWindow::refresh_groups(int preferredGroupId) {
     Configs::dataManager->settingsRepo->refreshing_group_list = true;
 
     for (int i = ui->tabWidget->count() - 1; i > 0; i--) {
         ui->tabWidget->removeTab(i);
     }
 
+    const auto tabOrder = Configs::dataManager->groupsRepo->GetGroupsTabOrder();
     int index = 0;
-    for (const auto &gid: Configs::dataManager->groupsRepo->GetGroupsTabOrder()) {
+    for (const auto &gid: tabOrder) {
         const auto group = Configs::dataManager->groupsRepo->GetGroup(gid);
         if (index == 0) {
             ui->tabWidget->setTabText(0, group->name);
@@ -166,15 +167,11 @@ void MainWindow::refresh_groups() {
         index++;
     }
 
-    if (Configs::dataManager->groupsRepo->CurrentGroup() == nullptr) {
-        Configs::dataManager->settingsRepo->current_group = -1;
-        ui->tabWidget->setCurrentIndex(groupId2TabIndex(0));
-        const auto tabOrder = Configs::dataManager->groupsRepo->GetGroupsTabOrder();
-        show_group(tabOrder.count() > 0 ? tabOrder.first() : 0);
-    } else {
-        ui->tabWidget->setCurrentIndex(groupId2TabIndex(Configs::dataManager->settingsRepo->current_group));
-        show_group(Configs::dataManager->settingsRepo->current_group);
-    }
+    int gid = Configs::dataManager->settingsRepo->current_group;
+    if (tabOrder.contains(preferredGroupId)) gid = preferredGroupId;
+    if (!tabOrder.contains(gid)) gid = tabOrder.value(0, 0);
+    ui->tabWidget->setCurrentIndex(groupId2TabIndex(gid));
+    show_group(gid);
 
     Configs::dataManager->settingsRepo->refreshing_group_list = false;
 }
@@ -188,17 +185,7 @@ void MainWindow::show_group_tab_menu(const QPoint &p) {
     const int clickedIndex = ui->tabWidget->tabBar()->tabAt(p);
     if (clickedIndex == -1) {
         QMenu menu(this);
-        connect(menu.addAction(tr("Add new Group")), &QAction::triggered, this, [=,this]{
-            auto ent = Configs::dataManager->groupsRepo->NewGroup();
-            auto dialog = new DialogEditGroup(ent, this);
-            const int ret = dialog->exec();
-            dialog->deleteLater();
-
-            if (ret == QDialog::Accepted) {
-                Configs::dataManager->groupsRepo->AddGroup(ent);
-                MW_dialog_message(MwMessage::GroupsChanged, {});
-            }
-        });
+        connect(menu.addAction(tr("Add new Group")), &QAction::triggered, ui->actionAdd_New_Group, &QAction::trigger);
 
         menu.exec(ui->tabWidget->tabBar()->mapToGlobal(p));
         return;
@@ -211,17 +198,7 @@ void MainWindow::show_group_tab_menu(const QPoint &p) {
 
     const auto clickedGroup = Configs::dataManager->groupsRepo->GetGroup(clickedGid);
 
-    connect(menu.addAction(tr("Add new Group")), &QAction::triggered, this, [=,this]{
-        auto ent = Configs::dataManager->groupsRepo->NewGroup();
-        auto dialog = new DialogEditGroup(ent, this);
-        const int ret = dialog->exec();
-        dialog->deleteLater();
-
-        if (ret == QDialog::Accepted) {
-            Configs::dataManager->groupsRepo->AddGroup(ent);
-            MW_dialog_message(MwMessage::GroupsChanged, {});
-        }
-    });
+    connect(menu.addAction(tr("Add new Group")), &QAction::triggered, ui->actionAdd_New_Group, &QAction::trigger);
     connect(menu.addAction(tr("Edit selected Group")), &QAction::triggered, this, [=,this]{
         auto ent = Configs::dataManager->groupsRepo->GetGroup(clickedGid);
         if (ent == nullptr) return;

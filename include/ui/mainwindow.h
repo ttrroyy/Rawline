@@ -116,7 +116,7 @@ public:
 
     void show_group_tab_menu(const QPoint &tabBarPos);
 
-    void refresh_groups();
+    void refresh_groups(int preferredGroupId = -1);
 
     void updateTabToolTip(int gid);
 

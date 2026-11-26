@@ -253,7 +253,7 @@ void MainWindow::handle_addsub(const QString &url, const QString &name) {
     group->url = url;
     group->skip_auto_update = !autoUpdate;
     Configs::dataManager->groupsRepo->AddGroup(group);
-    Engine::EngineEvents::SubscriptionNewGroup(group->id);
+    Engine::EngineEvents::GroupCreated(group->id);
     Subscription::updater()->RefreshGroup(group->id, nullptr, Subscription::GroupUpdater::Surface::Report);
 }
 

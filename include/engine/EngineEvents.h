@@ -13,7 +13,7 @@ namespace Engine {
     public:
         static EngineEvents *instance();
 
-        static void SubscriptionNewGroup(int groupId);
+        static void GroupCreated(int groupId);
         static void SubscriptionFinished(int importedCount, bool quiet);
         static void SubscriptionGroupChanged(int groupId, const QList<int> &disturbedProfileIds);
         static void SubscriptionDiff(const QString &title, const QString &body);
@@ -28,7 +28,7 @@ namespace Engine {
         static void SettingsChanged(const QStringList &keys);
 
     signals:
-        void subscriptionNewGroup(int groupId);
+        void groupCreated(int groupId);
         // importedCount < 0 when the job did not count.
         void subscriptionFinished(int importedCount, bool quiet);
         void subscriptionGroupChanged(int groupId, const QList<int> &disturbedProfileIds);

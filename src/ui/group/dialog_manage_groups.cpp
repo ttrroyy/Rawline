@@ -72,10 +72,9 @@ void DialogManageGroups::on_add_clicked() {
     int ret = dialog->exec();
     dialog->deleteLater();
 
-    if (ret == QDialog::Accepted) {
-        Configs::dataManager->groupsRepo->AddGroup(ent);
+    if (ret == QDialog::Accepted && Configs::dataManager->groupsRepo->AddGroup(ent)) {
         addGroupItem(ent->id);
-        MW_dialog_message(MwMessage::GroupsChanged, {});
+        Engine::EngineEvents::GroupCreated(ent->id);
     }
 }
 

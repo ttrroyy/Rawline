@@ -179,10 +179,9 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWi
 
     // AutoConnection, like the old runOnUiThread hop: direct for emits on the main thread, queued from workers.
     auto *engineEvents = Engine::EngineEvents::instance();
-    connect(engineEvents, &Engine::EngineEvents::subscriptionNewGroup, this, [this](int gid) {
-        refresh_groups();
-        // Focused on creation, not when the download ends: by then the user may have moved to another tab.
-        if (Configs::dataManager->groupsRepo->GetGroupsTabOrder().contains(gid)) ui->tabWidget->setCurrentIndex(groupId2TabIndex(gid));
+    connect(engineEvents, &Engine::EngineEvents::groupCreated, this, [this](int gid) {
+        refresh_groups(gid);
+        profilesTableModel->invalidateAddresses();
     });
     connect(engineEvents, &Engine::EngineEvents::subscriptionFinished, this, [this](int, bool) { refresh_proxy_list({}, true); });
     connect(engineEvents, &Engine::EngineEvents::subscriptionDiff, this, [](const QString &title, const QString &body) {
@@ -610,6 +609,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWi
         if (!ui->profilesTableView->isVisible()) return;
         refresh_proxy_list_column_size();
     });
+    ui->profilesTableView->viewport()->setMouseTracking(true);
     ui->profilesTableView->viewport()->installEventFilter(this);
     ui->masterLogBrowser->viewport()->installEventFilter(this);
     ui->data_view->viewport()->installEventFilter(this);
@@ -858,9 +858,8 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWi
         int ret = dialog->exec();
         dialog->deleteLater();
 
-        if (ret == QDialog::Accepted) {
-            Configs::dataManager->groupsRepo->AddGroup(ent);
-            MW_dialog_message(MwMessage::GroupsChanged, {});
+        if (ret == QDialog::Accepted && Configs::dataManager->groupsRepo->AddGroup(ent)) {
+            Engine::EngineEvents::GroupCreated(ent->id);
         }
     });
 

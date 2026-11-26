@@ -816,7 +816,7 @@ namespace Subscription {
             group->url = content;
             // Stored before the download: a failed one is fixed through the group's own TLS, HTTP and User Agent settings.
             Configs::dataManager->groupsRepo->AddGroup(group);
-            Engine::EngineEvents::SubscriptionNewGroup(group->id);
+            Engine::EngineEvents::GroupCreated(group->id);
             refresh(group->id, Surface::Report);
             emit asyncUpdateCallback(group->id);
         }, finish});

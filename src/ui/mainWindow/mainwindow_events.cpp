@@ -216,6 +216,11 @@ bool MainWindow::eventFilter(QObject *obj, QEvent *event) {
         if (split > 0 && ui->checkBox_SystemProxy->fontMetrics().horizontalAdvance(label) + 28 > ui->checkBox_SystemProxy->width()) displayed[split] = '\n';
         if (ui->checkBox_SystemProxy->text() != displayed) ui->checkBox_SystemProxy->setText(displayed);
     }
+    if (type == QEvent::MouseMove && obj == ui->profilesTableView->viewport()) {
+        const auto pos = static_cast<QMouseEvent *>(event)->position().toPoint();
+        auto *viewport = ui->profilesTableView->viewport();
+        viewport->setCursor(ui->profilesTableView->indexAt(pos).isValid() ? Qt::PointingHandCursor : Qt::ArrowCursor);
+    }
     // The viewport, not the window: splitter moves and scrollbar toggles change its width too.
     if (type == QEvent::Resize && obj == ui->profilesTableView->viewport()) {
         const auto *resize = static_cast<QResizeEvent *>(event);

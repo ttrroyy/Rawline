@@ -3,6 +3,7 @@
 #include "include/ui/widget/NewHome.hpp"
 
 #include "include/ui/mainwindow.h"
+#include "include/ui/group/dialog_edit_group.h"
 #include "include/ui/profile/dialog_edit_profile.h"
 #include "include/ui/utils/ProfilesTableModel.h"
 #include "include/ui/setting/ThemeManager.hpp"
@@ -11,6 +12,7 @@
 #include "include/configs/sub/GroupUpdater.hpp"
 #include "include/database/SettingsRepo.h"
 #include "include/engine/EngineHost.h"
+#include "include/engine/services/GroupService.h"
 
 #include <QApplication>
 #include <QBoxLayout>
@@ -26,6 +28,7 @@
 #include <QMouseEvent>
 #include <QFontMetrics>
 #include <QLabel>
+#include <QLineEdit>
 #include "include/database/GroupsRepo.h"
 #include <QPointer>
 #include <QPushButton>
@@ -531,6 +534,9 @@ void NewHome::runTour(MainWindow *mw, const QString &dir) {
                           caption->contentsRect().contains(icon->geometry()) &&
                           qAbs(icon->geometry().center().y() - caption->contentsRect().center().y()) <= 1,
                           "the title icon is clipped or off center");
+                    const auto *title = caption->findChild<QLabel *>(QStringLiteral("rawlineCaptionTitle"));
+                    const auto expectedFont = NewStyle::active() ? NewStyle::font(12) : qApp->font();
+                    check(title && title->font().family() == expectedFont.family(), "caption font did not follow the theme");
                 }
                 check(hasCaption(mainId) != custom, "the native main-window caption has the wrong state");
                 checkClientFrame(mainId, custom);
@@ -576,6 +582,10 @@ void NewHome::runTour(MainWindow *mw, const QString &dir) {
                 themeManager()->ApplyTheme(classic);
                 QApplication::processEvents();
                 check(child && dialog.windowFlags() == flags, "classic dialog flags or children changed");
+                check(child->cursor().shape() == Qt::PointingHandCursor, "classic theme lost the pointing cursor");
+                QPushButton classicButton;
+                classicButton.ensurePolished();
+                check(classicButton.cursor().shape() == Qt::PointingHandCursor, "new classic control has the wrong cursor");
 #ifdef Q_OS_WIN
                 const bool customMain = classicUsesCustomMainCaption;
                 check(mw->winId() == mainId && dialog.winId() == dialogId && hasCaption(dialogId),
@@ -645,5 +655,36 @@ void NewHome::runTour(MainWindow *mw, const QString &dir) {
 #endif
         })};
     }
+    s << std::pair{QStringLiteral("new-group-selected"), std::function<void()>([mw] {
+        auto *groups = Configs::dataManager->groupsRepo.get();
+        const auto existing = groups->GetGroupsTabOrder();
+        const int previous = Configs::dataManager->settingsRepo->current_group;
+        bool closed = false;
+        QTimer::singleShot(0, mw, [&closed] {
+            auto *dialog = qobject_cast<DialogEditGroup *>(QApplication::activeModalWidget());
+            if (!dialog) qFatal("New group dialog did not open");
+            closed = true;
+            dialog->reject();
+        });
+        mw->ui->actionAdd_New_Group->trigger();
+        if (!closed || groups->GetGroupsTabOrder() != existing ||
+            Configs::dataManager->settingsRepo->current_group != previous) qFatal("Cancel changed the current group");
+        QTimer::singleShot(0, mw, [] {
+            auto *dialog = qobject_cast<DialogEditGroup *>(QApplication::activeModalWidget());
+            if (!dialog) qFatal("New group dialog did not reopen");
+            auto *name = dialog->findChild<QLineEdit *>(QStringLiteral("name"));
+            auto *buttons = dialog->findChild<QDialogButtonBox *>();
+            if (!name || !buttons || !buttons->button(QDialogButtonBox::Ok)) qFatal("New group form is incomplete");
+            name->setText(QStringLiteral("UI tour group"));
+            buttons->button(QDialogButtonBox::Ok)->click();
+            if (dialog->result() != QDialog::Accepted) qFatal("New group was not accepted");
+        });
+        mw->ui->actionAdd_New_Group->trigger();
+        const auto current = groups->CurrentGroup();
+        if (!current || existing.contains(current->id) || current->name != QStringLiteral("UI tour group") ||
+            mw->ui->tabWidget->tabText(mw->ui->tabWidget->currentIndex()) != current->name)
+            qFatal("New group was not selected after saving");
+        if (Engine::GroupService::Delete(current->id)) qFatal("Could not delete the UI tour group");
+    })};
     QTimer::singleShot(4000, qApp, [tour] { run(tour); });
 }

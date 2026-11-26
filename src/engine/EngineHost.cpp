@@ -565,7 +565,7 @@ namespace Engine {
 
         // AutoConnection: emits from worker threads arrive queued on the main thread.
         auto *events = EngineEvents::instance();
-        connect(events, &EngineEvents::subscriptionNewGroup, this, relay(ChangeTopic::Groups | ChangeTopic::Profiles));
+        connect(events, &EngineEvents::groupCreated, this, relay(ChangeTopic::Groups | ChangeTopic::Profiles));
         connect(events, &EngineEvents::subscriptionFinished, this, relay(ChangeTopic::Groups | ChangeTopic::Profiles));
         connect(events, &EngineEvents::subscriptionGroupChanged, this, relay(ChangeTopic::Groups | ChangeTopic::Profiles));
         connect(events, &EngineEvents::groupOrderChanged, this, relay(ChangeTopic::Profiles));
