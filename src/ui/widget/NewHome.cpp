@@ -1765,16 +1765,18 @@ NewTitleBar::NewTitleBar(QWidget *parent) : QWidget(parent) {
     setFixedHeight(36);
     setMouseTracking(true);
     auto *row = new QHBoxLayout(this);
-    row->setContentsMargins(2, 4, 0, 0);
+    row->setContentsMargins(2, 0, 0, 0);
     row->setSpacing(2);
-    m_icon = new QLabel(this);
-    m_icon->setFixedSize(16, 16);
+    m_iconSlot = new QWidget(this);
+    m_iconSlot->setObjectName(QStringLiteral("rawlineCaptionIcon"));
+    m_iconSlot->setFixedSize(20, 20);
     m_title = new QLabel(this);
+    m_title->setAlignment(Qt::AlignLeading | Qt::AlignVCenter);
     m_title->setFont(NewStyle::font(12));
     m_title->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
     m_title->setAttribute(Qt::WA_TransparentForMouseEvents);
-    m_icon->setAttribute(Qt::WA_TransparentForMouseEvents);
-    row->addWidget(m_icon);
+    m_iconSlot->setAttribute(Qt::WA_TransparentForMouseEvents);
+    row->addWidget(m_iconSlot, 0, Qt::AlignVCenter);
     row->addSpacing(8);
     row->addWidget(m_title, 1);
     auto *minimize = new WindowButton(WindowButton::Minimize, this);
@@ -1795,23 +1797,26 @@ void NewTitleBar::follow(QWidget *window) {
     if (m_window == window) return;
     m_window = window;
     window->installEventFilter(this);
-    m_icon->setPixmap(window->windowIcon().pixmap(16, 16));
+    update();
     m_title->setText(window->windowTitle());
 }
 
 bool NewTitleBar::eventFilter(QObject *watched, QEvent *event) {
     if (watched == m_window && event->type() == QEvent::WindowTitleChange) m_title->setText(m_window->windowTitle());
-    if (watched == m_window && event->type() == QEvent::WindowIconChange) m_icon->setPixmap(m_window->windowIcon().pixmap(16, 16));
+    if (watched == m_window && event->type() == QEvent::WindowIconChange) update();
     return QWidget::eventFilter(watched, event);
 }
 
 void NewTitleBar::paintEvent(QPaintEvent *) {
+    if (!m_window) return;
+    QPainter painter(this);
 #ifdef Q_OS_WIN
-    if (NewStyle::active() && m_window && qobject_cast<MainWindow *>(m_window)) {
-        QPainter painter(this);
+    if (NewStyle::active() && qobject_cast<MainWindow *>(m_window)) {
         NewStyle::paintBackdrop(painter, QRect(QPoint(), m_window->size()));
     }
 #endif
+    // Paint into the layout slot so a classic theme's label padding cannot crop the icon.
+    m_window->windowIcon().paint(&painter, m_iconSlot->geometry());
 }
 
 bool NewTitleBar::onTopEdge(const QPoint &pos) const {

@@ -525,6 +525,13 @@ void NewHome::runTour(MainWindow *mw, const QString &dir) {
                 const auto *caption = mw->findChild<QWidget *>(QStringLiteral("rawlineMainCaption"));
                 check(caption && caption->isVisible() == custom && caption->findChildren<QAbstractButton *>().size() == 3,
                       "the wrong caption is visible");
+                if (custom) {
+                    const auto *icon = caption->findChild<QWidget *>(QStringLiteral("rawlineCaptionIcon"), Qt::FindDirectChildrenOnly);
+                    check(icon && icon->size() == QSize(20, 20) &&
+                          caption->contentsRect().contains(icon->geometry()) &&
+                          qAbs(icon->geometry().center().y() - caption->contentsRect().center().y()) <= 1,
+                          "the title icon is clipped or off center");
+                }
                 check(hasCaption(mainId) != custom, "the native main-window caption has the wrong state");
                 checkClientFrame(mainId, custom);
             };

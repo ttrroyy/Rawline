@@ -186,7 +186,7 @@ protected:
 private:
     // The window's top edge runs through the bar: a press there resizes instead of moving.
     bool onTopEdge(const QPoint &pos) const;
-    QLabel *m_icon = nullptr;
+    QWidget *m_iconSlot = nullptr;
     QLabel *m_title = nullptr;
     QWidget *m_window = nullptr;
 };
