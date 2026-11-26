@@ -79,6 +79,7 @@
 #define NOMINMAX
 #endif
 #include <windows.h>
+#include "include/sys/windows/WinVersion.h"
 #endif
 
 static QString T(const char *text) { return QCoreApplication::translate("NewHome", text); }
@@ -296,6 +297,13 @@ namespace {
     }
 
 #ifdef Q_OS_WIN
+    bool usesCustomWindowsCaption(const QWidget *window) {
+        if (NewStyle::active()) return true;
+        static const bool isWindows11 = WinVersion::IsBuildNumGreaterOrEqual(BuildNumber::Windows_11_21H2);
+        return isWindows11 && g_theme.compare(QStringLiteral("System"), Qt::CaseInsensitive) == 0 &&
+               qobject_cast<const MainWindow *>(window);
+    }
+
     bool handleWindowsFrame(QWidget *window, const MSG *msg, qintptr *result) {
         if (msg->message == WM_STYLECHANGING && static_cast<int>(msg->wParam) == GWL_STYLE &&
             window->property("rawlineSavedCaptionWindow").toULongLong() == quint64(reinterpret_cast<quintptr>(msg->hwnd))) {
@@ -343,7 +351,8 @@ namespace {
         auto newStyle = oldStyle;
         constexpr LONG_PTR captionMask = WS_CAPTION;
         const auto savedWindow = window->property("rawlineSavedCaptionWindow").toULongLong();
-        if (NewStyle::active()) {
+        const bool custom = usesCustomWindowsCaption(window);
+        if (custom) {
             if (savedWindow != quint64(id)) {
                 window->setProperty("rawlineSavedCaptionWindow", quint64(id));
                 window->setProperty("rawlineSavedCaptionBits", quint32(oldStyle & captionMask));
@@ -355,22 +364,13 @@ namespace {
             window->setProperty("rawlineSavedCaptionWindow", QVariant());
             window->setProperty("rawlineSavedCaptionBits", QVariant());
         }
-        if (!NewStyle::active()) clipNativeFrame(window, hwnd, false);
+        if (!custom) clipNativeFrame(window, hwnd, false);
         if (newStyle != oldStyle) SetWindowLongPtrW(hwnd, GWL_STYLE, newStyle);
-        if (!NewStyle::active() && savedWindow == quint64(id)) {
-            using SetTheme = HRESULT(WINAPI *)(HWND, LPCWSTR, LPCWSTR);
-            static const auto resetTheme = [] {
-                const HMODULE uxTheme = LoadLibraryW(L"uxtheme.dll");
-                return uxTheme ? reinterpret_cast<SetTheme>(GetProcAddress(uxTheme, "SetWindowTheme")) : nullptr;
-            }();
-            // Rebind the restored caption to the user's current visual style on the same HWND.
-            if (resetTheme) resetTheme(hwnd, nullptr, nullptr);
-            NewStyle::themeFrame(window);
-        }
+        if (custom || savedWindow == quint64(id)) NewStyle::themeFrame(window);
         SetWindowPos(hwnd, nullptr, 0, 0, 0, 0,
                      SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
         NewStyle::themeFrame(window);
-        if (!NewStyle::active()) RedrawWindow(hwnd, nullptr, nullptr, RDW_INVALIDATE | RDW_FRAME);
+        if (!custom) RedrawWindow(hwnd, nullptr, nullptr, RDW_INVALIDATE | RDW_FRAME);
     }
 
     void clipNativeFrame(QWidget *window, HWND hwnd, bool themed) {
@@ -505,7 +505,7 @@ namespace {
                 if (event->type() == QEvent::WinIdChange) widget->setProperty("rawlineNativeFrameRegion", QVariant());
                 if (widget->isVisible() && widget->internalWinId() &&
                     (widget->windowFlags() & Qt::WindowTitleHint) && !(widget->windowFlags() & Qt::FramelessWindowHint))
-                    clipNativeFrame(widget, reinterpret_cast<HWND>(widget->internalWinId()), NewStyle::active());
+                    clipNativeFrame(widget, reinterpret_cast<HWND>(widget->internalWinId()), usesCustomWindowsCaption(widget));
             }
 #endif
             if (!NewStyle::active()) return false;
@@ -736,11 +736,11 @@ void NewStyle::themeFrame(QWidget *window) {
         !(window->windowFlags() & Qt::WindowTitleHint) || (window->windowFlags() & Qt::FramelessWindowHint)) return;
     const HWND hwnd = reinterpret_cast<HWND>(window->internalWinId());
     const bool themed = active();
-    clipNativeFrame(window, hwnd, themed);
+    const bool custom = usesCustomWindowsCaption(window);
+    clipNativeFrame(window, hwnd, custom);
     if (!set) return;
-    // With WS_CAPTION removed the custom frame can keep the default policy. A restored
-    // caption needs an explicit hand-off to DWM after the native frame is recalculated.
-    const DWORD policy = themed ? 0 /* DWMNCRP_USEWINDOWSTYLE */ : 2 /* DWMNCRP_ENABLED */;
+    // Only native captions should be drawn by DWM.
+    const DWORD policy = custom ? 1 /* DWMNCRP_DISABLED */ : 2 /* DWMNCRP_ENABLED */;
     set(hwnd, 2 /* DWMWA_NCRENDERING_POLICY */, &policy, sizeof policy);
     const BOOL dark = themed ? !light() : qApp->palette().color(QPalette::Window).lightness() < 128;
     set(hwnd, 20 /* DWMWA_USE_IMMERSIVE_DARK_MODE */, &dark, sizeof dark);
@@ -3643,7 +3643,8 @@ void MainWindow::applyInterfaceStyle(bool animated) {
     if (wantNew) framePalette.setColor(QPalette::Window, NewStyle::background());
     centralWidget()->setPalette(framePalette);
     centralWidget()->setAutoFillBackground(true);
-    centralWidget()->findChild<QWidget *>(QStringLiteral("rawlineMainCaption"), Qt::FindDirectChildrenOnly)->setVisible(wantNew);
+    centralWidget()->findChild<QWidget *>(QStringLiteral("rawlineMainCaption"), Qt::FindDirectChildrenOnly)
+        ->setVisible(usesCustomWindowsCaption(this));
 #endif
     // The hidden page must not hold the window to its own minimum: the new one goes down to a phone's width.
     if (QWidget *classic = rootStack->widget(0)) {
@@ -3680,7 +3681,7 @@ void MainWindow::applyInterfaceStyle(bool animated) {
 
 void MainWindow::syncWindowFrame() {
 #ifdef Q_OS_WIN
-    const bool custom = NewStyle::active();
+    const bool custom = usesCustomWindowsCaption(this);
     if (const auto id = internalWinId(); id && (property("rawlineCaptionWindow").toULongLong() != quint64(id) ||
                                                property("rawlineCustomCaption").toBool() != custom)) {
         setProperty("rawlineCaptionWindow", quint64(id));
@@ -3710,7 +3711,7 @@ void MainWindow::syncWindowFrame() {
 
 #ifdef Q_OS_WIN
 bool MainWindow::nativeEvent(const QByteArray &eventType, void *message, qintptr *result) {
-    if (NewStyle::active() && handleWindowsFrame(this, static_cast<const MSG *>(message), result)) return true;
+    if (usesCustomWindowsCaption(this) && handleWindowsFrame(this, static_cast<const MSG *>(message), result)) return true;
     return QMainWindow::nativeEvent(eventType, message, result);
 }
 #endif

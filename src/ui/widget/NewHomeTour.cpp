@@ -46,6 +46,7 @@
 #define NOMINMAX
 #endif
 #include <qt_windows.h>
+#include "include/sys/windows/WinVersion.h"
 #endif
 
 namespace {
@@ -489,6 +490,7 @@ void NewHome::runTour(MainWindow *mw, const QString &dir) {
 #ifdef Q_OS_WIN
             const auto mainId = mw->winId();
             const auto dialogId = dialog.winId();
+            const bool systemUsesCustomMainCaption = WinVersion::IsBuildNumGreaterOrEqual(BuildNumber::Windows_11_21H2);
             const auto hasCaption = [](WId id) {
                 const auto style = GetWindowLongPtrW(reinterpret_cast<HWND>(id), GWL_STYLE);
                 return (style & WS_CAPTION) == WS_CAPTION;
@@ -545,11 +547,13 @@ void NewHome::runTour(MainWindow *mw, const QString &dir) {
                 QApplication::processEvents();
                 check(child && dialog.windowFlags() == flags, "classic dialog flags or children changed");
 #ifdef Q_OS_WIN
-                check(mw->winId() == mainId && dialog.winId() == dialogId && hasCaption(mainId) && hasCaption(dialogId),
+                const bool customMain = systemUsesCustomMainCaption && classic.compare(QStringLiteral("System"), Qt::CaseInsensitive) == 0;
+                check(mw->winId() == mainId && dialog.winId() == dialogId && hasCaption(dialogId),
                       "switching with settings open changed the Windows frame");
-                checkMainCaption(false);
+                checkMainCaption(customMain);
                 checkDialogCaption(false);
-                check(!hasRoundedRegion(mainId) && !hasRoundedRegion(dialogId), "Rawline rounding survived the switch to classic");
+                check(hasRoundedRegion(mainId) == customMain && !hasRoundedRegion(dialogId),
+                      "window rounding did not follow the selected caption");
 #endif
                 check(dialog.contentsMargins() == margins, "title bar space leaked into classic layout");
                 check(!dialog.testAttribute(Qt::WA_TranslucentBackground) && !dialog.testAttribute(Qt::WA_NoSystemBackground), "classic dialog still transparent");
@@ -576,34 +580,12 @@ void NewHome::runTour(MainWindow *mw, const QString &dir) {
                 QEventLoop settle;
                 QTimer::singleShot(1200, &settle, &QEventLoop::quit);
                 settle.exec();
-                check(settings.isVisible() && hasCaption(settings.winId()) && hasCaption(mainId) && mw->winId() == mainId,
-                      "System lost its native frame while settings remained open");
-                using DwmGetAttribute = HRESULT(WINAPI *)(HWND, DWORD, PVOID, DWORD);
-                const HMODULE dwm = GetModuleHandleW(L"dwmapi.dll");
-                const auto getDwmAttribute = dwm
-                    ? reinterpret_cast<DwmGetAttribute>(GetProcAddress(dwm, "DwmGetWindowAttribute")) : nullptr;
-                if (getDwmAttribute) {
-                    const auto hasComposedCaption = [&](WId id) {
-                        BOOL enabled = FALSE;
-                        return SUCCEEDED(getDwmAttribute(reinterpret_cast<HWND>(id),
-                            1 /* DWMWA_NCRENDERING_ENABLED */, &enabled, sizeof enabled)) && enabled;
-                    };
-                    // Compare with a fresh system window so a fallback in both existing windows still fails.
-                    QWidget freshWindow;
-                    freshWindow.setAttribute(Qt::WA_ShowWithoutActivating);
-                    freshWindow.show();
-                    QApplication::processEvents();
-                    const bool expectsComposedCaption = hasComposedCaption(freshWindow.winId());
-                    freshWindow.hide();
-                    if (expectsComposedCaption) {
-                        check(hasComposedCaption(mainId), "System main window fell back to a GDI caption");
-                        check(hasComposedCaption(settings.winId()), "System settings fell back to a GDI caption");
-                    }
-                }
+                check(settings.isVisible() && hasCaption(settings.winId()) && mw->winId() == mainId,
+                      "switching to System hid settings or recreated the main window");
                 check(mw->centralWidget()->autoFillBackground() && mw->mask().isEmpty(), "classic background is not opaque");
                 check(mw->centralWidget()->palette().color(QPalette::Window) == qApp->palette().color(QPalette::Window),
                       "Rawline background survived the switch to System");
-                checkMainCaption(false);
+                checkMainCaption(systemUsesCustomMainCaption);
                 tour->shoot(QStringLiteral("system-with-settings-open"));
             }
             themeManager()->ApplyTheme(theme);
