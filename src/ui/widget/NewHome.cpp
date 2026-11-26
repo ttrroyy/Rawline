@@ -1745,6 +1745,16 @@ namespace {
 }
 
 namespace {
+    class CaptionIcon : public QWidget {
+    public:
+        using QWidget::QWidget;
+    protected:
+        void paintEvent(QPaintEvent *) override {
+            QPainter painter(this);
+            window()->windowIcon().paint(&painter, rect());
+        }
+    };
+
     void changeWindowSize(QWidget *window, bool minimize) {
 #ifdef Q_OS_WIN
         if (const auto id = window->internalWinId()) {
@@ -1767,7 +1777,7 @@ NewTitleBar::NewTitleBar(QWidget *parent) : QWidget(parent) {
     auto *row = new QHBoxLayout(this);
     row->setContentsMargins(2, 0, 0, 0);
     row->setSpacing(2);
-    m_iconSlot = new QWidget(this);
+    m_iconSlot = new CaptionIcon(this);
     m_iconSlot->setObjectName(QStringLiteral("rawlineCaptionIcon"));
     m_iconSlot->setFixedSize(20, 20);
     m_title = new QLabel(this);
@@ -1797,26 +1807,23 @@ void NewTitleBar::follow(QWidget *window) {
     if (m_window == window) return;
     m_window = window;
     window->installEventFilter(this);
-    update();
+    m_iconSlot->update();
     m_title->setText(window->windowTitle());
 }
 
 bool NewTitleBar::eventFilter(QObject *watched, QEvent *event) {
     if (watched == m_window && event->type() == QEvent::WindowTitleChange) m_title->setText(m_window->windowTitle());
-    if (watched == m_window && event->type() == QEvent::WindowIconChange) update();
+    if (watched == m_window && event->type() == QEvent::WindowIconChange) m_iconSlot->update();
     return QWidget::eventFilter(watched, event);
 }
 
 void NewTitleBar::paintEvent(QPaintEvent *) {
-    if (!m_window) return;
-    QPainter painter(this);
 #ifdef Q_OS_WIN
-    if (NewStyle::active() && qobject_cast<MainWindow *>(m_window)) {
+    if (NewStyle::active() && m_window && qobject_cast<MainWindow *>(m_window)) {
+        QPainter painter(this);
         NewStyle::paintBackdrop(painter, QRect(QPoint(), m_window->size()));
     }
 #endif
-    // Paint into the layout slot so a classic theme's label padding cannot crop the icon.
-    m_window->windowIcon().paint(&painter, m_iconSlot->geometry());
 }
 
 bool NewTitleBar::onTopEdge(const QPoint &pos) const {
