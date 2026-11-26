@@ -365,10 +365,11 @@ namespace {
             }();
             // Rebind the restored caption to the user's current visual style on the same HWND.
             if (resetTheme) resetTheme(hwnd, nullptr, nullptr);
+            NewStyle::themeFrame(window);
         }
-        NewStyle::themeFrame(window);
         SetWindowPos(hwnd, nullptr, 0, 0, 0, 0,
                      SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+        NewStyle::themeFrame(window);
         if (!NewStyle::active()) RedrawWindow(hwnd, nullptr, nullptr, RDW_INVALIDATE | RDW_FRAME);
     }
 
@@ -737,9 +738,9 @@ void NewStyle::themeFrame(QWidget *window) {
     const bool themed = active();
     clipNativeFrame(window, hwnd, themed);
     if (!set) return;
-    // The custom frame is already captionless. Disabling DWM can leave a GDI caption
-    // when the same window regains WS_CAPTION, so follow the current window style.
-    const DWORD policy = 0; // DWMNCRP_USEWINDOWSTYLE
+    // With WS_CAPTION removed the custom frame can keep the default policy. A restored
+    // caption needs an explicit hand-off to DWM after the native frame is recalculated.
+    const DWORD policy = themed ? 0 /* DWMNCRP_USEWINDOWSTYLE */ : 2 /* DWMNCRP_ENABLED */;
     set(hwnd, 2 /* DWMWA_NCRENDERING_POLICY */, &policy, sizeof policy);
     const BOOL dark = themed ? !light() : qApp->palette().color(QPalette::Window).lightness() < 128;
     set(hwnd, 20 /* DWMWA_USE_IMMERSIVE_DARK_MODE */, &dark, sizeof dark);
