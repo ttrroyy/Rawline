@@ -42,13 +42,13 @@
 #include <QLineEdit>
 #include <QLocale>
 #include <QMenu>
+#include <QMessageBox>
 #include <QMimeData>
 #include <QMouseEvent>
 #include <QPainter>
 #include <QPainterPath>
 #include <QPointer>
 #include <QKeyEvent>
-#include <QFocusFrame>
 #include <QProxyStyle>
 #include <QStyleFactory>
 #include <QStyleOption>
@@ -63,6 +63,7 @@
 #include <QTabBar>
 #include <QTextBrowser>
 #include <QTimer>
+#include <QToolButton>
 #include <QVariantAnimation>
 #include <QWheelEvent>
 #include <QVBoxLayout>
@@ -298,10 +299,9 @@ namespace {
 
 #ifdef Q_OS_WIN
     bool usesCustomWindowsCaption(const QWidget *window) {
-        if (NewStyle::active()) return true;
         static const bool isWindows11 = WinVersion::IsBuildNumGreaterOrEqual(BuildNumber::Windows_11_21H2);
-        return isWindows11 && g_theme.compare(QStringLiteral("System"), Qt::CaseInsensitive) == 0 &&
-               qobject_cast<const MainWindow *>(window);
+        if (isWindows11 && qobject_cast<const MainWindow *>(window)) return true;
+        return NewStyle::active() && !qobject_cast<const QMessageBox *>(window);
     }
 
     bool handleWindowsFrame(QWidget *window, const MSG *msg, qintptr *result) {
@@ -416,6 +416,10 @@ namespace {
     constexpr int kDialogBar = 36, kDialogRadius = 14, kDialogGrip = 6;
 
     void frameDialog(QDialog *dialog) {
+#ifdef Q_OS_WIN
+        // QMessageBox owns a fixed layout and recalculates it when it is shown.
+        if (qobject_cast<QMessageBox *>(dialog)) return;
+#endif
         if (dialog->property("newFrame").toBool()) return;
         const bool shown = dialog->isVisible();
         dialog->setProperty("newFrame", true);
@@ -938,6 +942,8 @@ QString NewStyle::styleSheet() {
         "QToolButton { background: transparent; border: none; border-radius: 10px; padding: 4px; }\n"
         "QToolButton:hover { background: %6; }\n"
         "QToolButton:checked, QToolButton:pressed { background: %9; }\n"
+        "QToolButton#rawlineSubscriptionRouting { border-radius: 12px; padding: 0; }\n"
+        "QToolButton#rawlineSubscriptionRouting:focus { border: 1px solid %4; }\n"
         "QLineEdit, QPlainTextEdit, QTextEdit, QAbstractSpinBox, QComboBox, QKeySequenceEdit { background: %10; border: 1px solid transparent; border-radius: 12px; padding: 5px 10px; selection-background-color: %11; selection-color: %3; }\n"
         "QAbstractSpinBox QLineEdit, QComboBox QLineEdit { background: transparent; border: none; border-radius: 0; padding: 0; }\n"
         "QAbstractSpinBox::up-button, QAbstractSpinBox::down-button { border: none; background: transparent; width: 20px; }\n"
@@ -2236,7 +2242,6 @@ NewHome::NewHome(MainWindow *window) : QWidget(nullptr), mw(window) {
         m_down->setText(QStringLiteral("↓ ") + ReadableSize(qint64(m_rateDown)) + QStringLiteral("/s"));
         m_up->setText(QStringLiteral("↑ ") + ReadableSize(qint64(m_rateUp)) + QStringLiteral("/s"));
     });
-    connect(mw->ui->tabWidget, &QTabWidget::currentChanged, this, [this] { groupChanged(); });
     connect(mw->ui->toolButton_startstop, &StartStopButton::stateChanged, this, &NewHome::refreshConnectionOrb);
     connect(mw->connection(), &Engine::ConnectionManager::busyChanged, this, &NewHome::refreshConnectionOrb);
     connect(themeManager(), &ThemeManager::themeChanged, this, [this] {
@@ -2460,11 +2465,8 @@ void NewHome::buildBody(QVBoxLayout *body) {
     names->addWidget(m_groupDate);
     m_groupHeading = new QWidget;
     m_groupHeading->setLayout(names);
-    m_groupHeading->setCursor(Qt::PointingHandCursor);
     for (auto *widget : {m_groupHeading, static_cast<QWidget *>(m_groupName), static_cast<QWidget *>(m_groupDate)}) widget->installEventFilter(this);
     title->addWidget(m_groupHeading, 1);
-    m_groupHeading->setAccessibleName(T("Groups"));
-    (new QFocusFrame(m_groupHeading))->setWidget(m_groupHeading);
     const auto action = [this, title](const QString &icon, const QString &tip, const std::function<void()> &callback) {
         auto *button = new NewTile(NewTile::Icon);
         button->setFlat(true);
@@ -2482,26 +2484,30 @@ void NewHome::buildBody(QVBoxLayout *body) {
     m_groupMore = action("more", T("More"), [this] { showGroupMenu(); });
     subscription->addLayout(title);
     m_routeLine = label({}, 11, true);
-    m_routeBox = new QWidget;
-    auto *routeRow = new QHBoxLayout(m_routeBox);
-    routeRow->setContentsMargins(22, 0, 12, 8);
+    auto *routeButton = new QToolButton;
+    m_routeBox = routeButton;
+    routeButton->setObjectName(QStringLiteral("rawlineSubscriptionRouting"));
+    routeButton->setFocusPolicy(Qt::StrongFocus);
+    auto *routeHolder = new QHBoxLayout;
+    routeHolder->setContentsMargins(12, 0, 12, 4);
+    routeHolder->addWidget(routeButton);
+    auto *routeRow = new QHBoxLayout(routeButton);
+    routeRow->setContentsMargins(8, 4, 10, 4);
     routeRow->setSpacing(6);
-    auto *routeIcon = new NewTile(NewTile::Icon);
-    routeIcon->setIconName("route");
-    routeIcon->setFlat(true);
-    routeIcon->setFixedSize(24, 24);
-    routeIcon->setToolTip(T("Routing"));
-    connect(routeIcon, &QAbstractButton::clicked, this, [this, routeIcon] {
-        mw->ui->menuRouting_Menu->popup(routeIcon->mapToGlobal(QPoint(0, routeIcon->height())));
+    m_routeIcon = new QLabel;
+    m_routeIcon->setFixedSize(14, 14);
+    m_routeIcon->setAttribute(Qt::WA_TransparentForMouseEvents);
+    m_routeLine->setAttribute(Qt::WA_TransparentForMouseEvents);
+    connect(routeButton, &QAbstractButton::clicked, this, [this, routeButton] {
+        guardReopen(mw->ui->menuRouting_Menu, routeButton);
+        mw->ui->menuRouting_Menu->popup(routeButton->mapToGlobal(QPoint(0, routeButton->height())));
     });
-    routeRow->addWidget(routeIcon);
+    routeRow->addWidget(m_routeIcon);
     routeRow->addWidget(m_routeLine, 1);
-    m_routeLine->setCursor(Qt::PointingHandCursor);
-    // Wraps rather than cutting the label off; wrapped, a long profile name never widens the panel either.
+    m_routeLine->setTextFormat(Qt::PlainText);
     m_routeLine->setWordWrap(true);
     m_routeLine->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
-    m_routeLine->installEventFilter(this);
-    subscription->addWidget(m_routeBox);
+    subscription->addLayout(routeHolder);
 
     m_traffic = new QWidget;
     auto *traffic = new QHBoxLayout(m_traffic);
@@ -2544,6 +2550,7 @@ void NewHome::buildBody(QVBoxLayout *body) {
     m_expiry->setContentsMargins(14, 0, 14, 8);
     subscription->addWidget(m_expiry);
     m_announce = label({}, 12, true);
+    m_announce->setTextFormat(Qt::PlainText);
     m_announce->setWordWrap(true);
     m_announce->setContentsMargins(14, 0, 14, 10);
     m_announce->setCursor(Qt::PointingHandCursor);
@@ -2680,13 +2687,16 @@ void NewHome::selectTab(int index, bool animated) {
 
 void NewHome::groupChanged() {
     if (!m_attached) return;
-    refreshGroupHeader();
     const int current = Configs::dataManager->settingsRepo->current_group;
-    // Only a change of group rises; the first render is simply there.
-    if (m_renderedGroup != -1 && m_renderedGroup != current && m_pages->currentIndex() == 0) NewStyle::rise(m_list, 14, 240);
+    const bool changed = m_renderedGroup != current;
     m_renderedGroup = current;
-    // The classic table scrolls to the chosen server; so does the list, once the group's rows are in.
-    QTimer::singleShot(0, m_list, [this] { if (m_list->currentIndex().isValid()) m_list->scrollTo(m_list->currentIndex(), QAbstractItemView::PositionAtCenter); });
+    if (changed) m_announceOpen = false;
+    refreshGroupHeader();
+    if (changed) {
+        m_list->scrollToTop();
+        m_subscriptionScroll->setValue(0);
+    }
+    updateSubscriptionScroll();
 }
 
 void NewHome::updateNotice() {
@@ -2748,11 +2758,14 @@ void NewHome::refreshGroupHeader() {
         .arg(group->id).arg(group->name).arg(group->sub_last_update).arg(sub.used()).arg(sub.total).arg(sub.expire)
         .arg(sub.announce, sub.support_url).arg(int(mw_sub_updating) * 2 + int(m_announceOpen)).arg(route);
     m_routeBox->setVisible(!route.isEmpty());
-    m_routeLine->setToolTip(route);
-    m_routeLine->setText(route);
     m_refresh->setSpinning(subscription && mw_sub_updating);
     if (key == m_headerKey) return;
     m_headerKey = key;
+    m_routeBox->setToolTip(route);
+    m_routeBox->setAccessibleName(route);
+    m_routeLine->setText(route);
+    m_routeIcon->setPixmap(NewStyle::icon(QStringLiteral("route"), NewStyle::muted())
+        .pixmap(m_routeIcon->size(), devicePixelRatioF()));
     m_chip->setText(group->name);
     m_chip->setToolTip(group->name);
     m_groupName->setText(group->name);
@@ -3581,7 +3594,6 @@ bool NewHome::eventFilter(QObject *watched, QEvent *event) {
                 }
                 return true;
             }
-            if (watched != m_chip) { showGroupPicker(); return true; }
         }
         if (watched != m_chip) return true;
     }
@@ -3589,12 +3601,6 @@ bool NewHome::eventFilter(QObject *watched, QEvent *event) {
     if (event->type() == QEvent::MouseButtonPress && static_cast<QMouseEvent *>(event)->button() == Qt::LeftButton) {
         if (watched == m_check) { checkCurrentConnection(); return true; }
         if (watched == m_announce) { m_announceOpen = !m_announceOpen; refreshGroupHeader(); return true; }
-        // The routing line opens the routing menu under it: the profiles, the provider's routing when it decides.
-        if (watched == m_routeLine) {
-            guardReopen(mw->ui->menuRouting_Menu, m_routeLine);
-            mw->ui->menuRouting_Menu->popup(m_routeLine->mapToGlobal(QPoint(8, m_routeLine->height())));
-            return true;
-        }
     }
     return QWidget::eventFilter(watched, event);
 }

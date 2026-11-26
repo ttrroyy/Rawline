@@ -35,7 +35,7 @@ inline const NewIconPath newIcon_tun[] = {
     {"M4,3 L20,3 L20,14 L16,18 L8,18 L4,14 Z M8,7 L8,11 M12,7 L12,11 M16,7 L16,11 M9,18 L9,21 L15,21 L15,18", 2.2f},
 };
 inline const NewIconPath newIcon_route[] = {
-    {"M12,21 L12,12 M12,12 L5,5 M5,5 L5,10 M5,5 L10,5 M12,12 L19,5 M19,5 L19,10 M19,5 L14,5", 2.4f},
+    {"M12,20 L12,11 M12,11 L5,4 M5,4 L5,9 M5,4 L10,4 M12,11 L19,4 M19,4 L19,9 M19,4 L14,4", 2.4f},
 };
 inline const NewIconPath newIcon_subscriptions[] = {
     {"M4,5 L20,5 L20,20 L4,20 Z M8,2 L16,2 M8,10 L16,10 M8,15 L14,15", 2.3f},

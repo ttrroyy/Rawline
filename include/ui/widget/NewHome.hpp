@@ -339,6 +339,7 @@ private:
     QLabel *m_announce = nullptr;
     // Which routing the subscription runs with; a click opens where it is changed.
     QLabel *m_routeLine = nullptr;
+    QLabel *m_routeIcon = nullptr;
     QWidget *m_routeBox = nullptr;
     bool m_routeFromProvider = false;
     QLineEdit *m_search = nullptr;

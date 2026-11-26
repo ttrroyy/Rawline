@@ -22,8 +22,10 @@
 #include <QFile>
 #include <QTextStream>
 #include <QMenu>
+#include <QMessageBox>
 #include <QMouseEvent>
 #include <QFontMetrics>
+#include <QLabel>
 #include "include/database/GroupsRepo.h"
 #include <QPointer>
 #include <QPushButton>
@@ -229,7 +231,16 @@ void NewHome::runTour(MainWindow *mw, const QString &dir) {
             check(!selection->hasSelection(), "empty list background kept selection");
             check((mw->runningSnapshot() ? mw->runningSnapshot()->id : -1) == running, "clearing view selection changed the running profile");
             check(h->m_routeBox->isVisible(), "subscription routing row missing");
-            check(h->m_routeBox->findChildren<QAbstractButton *>().size() == 1, "routing icon missing");
+            check(qobject_cast<QAbstractButton *>(h->m_routeBox) && h->m_routeBox->findChildren<QAbstractButton *>().isEmpty(),
+                  "the routing icon and text must be one control");
+            click(h->m_routeBox, h->m_routeBox->rect().center());
+            check(QApplication::activePopupWidget(), "routing button did not open its menu");
+            QApplication::activePopupWidget()->close();
+            click(h->m_groupName, h->m_groupName->rect().center());
+            check(!QApplication::activePopupWidget(), "subscription title opened the picker");
+            click(h->m_chip, h->m_chip->rect().center());
+            check(QApplication::activePopupWidget(), "subscription picker did not open from its button");
+            QApplication::activePopupWidget()->close();
         })};
         s << std::pair{QStringLiteral("groups"), std::function<void()>([home] { home()->showGroupPicker(); })};
         s << std::pair{QStringLiteral("fixed-subscription-picker"), std::function<void()>([home] {
@@ -490,7 +501,7 @@ void NewHome::runTour(MainWindow *mw, const QString &dir) {
 #ifdef Q_OS_WIN
             const auto mainId = mw->winId();
             const auto dialogId = dialog.winId();
-            const bool systemUsesCustomMainCaption = WinVersion::IsBuildNumGreaterOrEqual(BuildNumber::Windows_11_21H2);
+            const bool classicUsesCustomMainCaption = WinVersion::IsBuildNumGreaterOrEqual(BuildNumber::Windows_11_21H2);
             const auto hasCaption = [](WId id) {
                 const auto style = GetWindowLongPtrW(reinterpret_cast<HWND>(id), GWL_STYLE);
                 return (style & WS_CAPTION) == WS_CAPTION;
@@ -526,6 +537,18 @@ void NewHome::runTour(MainWindow *mw, const QString &dir) {
             checkMainCaption(true);
             checkDialogCaption(true);
             check(hasRoundedRegion(mainId) && hasRoundedRegion(dialogId), "new Windows frame is still rectangular");
+            {
+                QMessageBox confirmation(QMessageBox::Question, QStringLiteral("Confirmation"),
+                    QStringLiteral("Remove one profile?"), QMessageBox::Yes | QMessageBox::No, mw);
+                confirmation.show();
+                QApplication::processEvents();
+                check(!hasRoundedRegion(confirmation.winId()), "confirmation inherited a clipped window region");
+                for (auto *button : confirmation.buttons()) {
+                    check(button->isVisible() &&
+                          confirmation.rect().contains(QRect(button->mapTo(&confirmation, QPoint()), button->size())),
+                          "confirmation does not fit its buttons");
+                }
+            }
             const auto previousTitle = mw->windowTitle();
             mw->setWindowTitle(QStringLiteral("Rawline caption regression"));
             dialog.setWindowTitle(QStringLiteral("Dialog caption regression"));
@@ -547,7 +570,7 @@ void NewHome::runTour(MainWindow *mw, const QString &dir) {
                 QApplication::processEvents();
                 check(child && dialog.windowFlags() == flags, "classic dialog flags or children changed");
 #ifdef Q_OS_WIN
-                const bool customMain = systemUsesCustomMainCaption && classic.compare(QStringLiteral("System"), Qt::CaseInsensitive) == 0;
+                const bool customMain = classicUsesCustomMainCaption;
                 check(mw->winId() == mainId && dialog.winId() == dialogId && hasCaption(dialogId),
                       "switching with settings open changed the Windows frame");
                 checkMainCaption(customMain);
@@ -585,7 +608,7 @@ void NewHome::runTour(MainWindow *mw, const QString &dir) {
                 check(mw->centralWidget()->autoFillBackground() && mw->mask().isEmpty(), "classic background is not opaque");
                 check(mw->centralWidget()->palette().color(QPalette::Window) == qApp->palette().color(QPalette::Window),
                       "Rawline background survived the switch to System");
-                checkMainCaption(systemUsesCustomMainCaption);
+                checkMainCaption(classicUsesCustomMainCaption);
                 tour->shoot(QStringLiteral("system-with-settings-open"));
             }
             themeManager()->ApplyTheme(theme);
@@ -601,15 +624,18 @@ void NewHome::runTour(MainWindow *mw, const QString &dir) {
                 check(mw->isVisible() && !(classicFlags & Qt::FramelessWindowHint), "main window did not regain its system frame");
                 check((classicFlags & captionButtons) == captionButtons, "system title bar buttons are missing");
                 check(mw->mask().isEmpty(), "new theme corner mask survived the switch");
-                tour->shoot(QStringLiteral("theme-to-") + classic);
-                themeManager()->ApplyTheme(theme);
 #ifdef Q_OS_WIN
-                check(mw->winId() == mainId, "switching back recreated the main window");
-                checkMainCaption(true);
-#else
-                check(mw->windowFlags() & Qt::FramelessWindowHint, "main window did not recover the Rawline frame");
+                checkMainCaption(classicUsesCustomMainCaption);
 #endif
+                tour->shoot(QStringLiteral("theme-to-") + classic);
             }
+            themeManager()->ApplyTheme(theme);
+#ifdef Q_OS_WIN
+            check(mw->winId() == mainId, "switching back recreated the main window");
+            checkMainCaption(true);
+#else
+            check(mw->windowFlags() & Qt::FramelessWindowHint, "main window did not recover the Rawline frame");
+#endif
         })};
     }
     QTimer::singleShot(4000, qApp, [tour] { run(tour); });

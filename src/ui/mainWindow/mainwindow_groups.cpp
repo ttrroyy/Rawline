@@ -16,6 +16,7 @@
 #include "include/engine/tests/TestRunner.h"
 #include "include/ui/stats/dialog_endpoint_details.h"
 #include "include/ui/utils/ProfilesTableFilterHeader.h"
+#include "include/ui/widget/NewHome.hpp"
 #include "include/global/Utils.hpp"
 
 void MainWindow::on_tabWidget_currentChanged(int index) {
@@ -122,6 +123,7 @@ void MainWindow::show_group(int gid) {
     updateTabToolTip(gid);
 
     refresh_proxy_list({}, true);
+    if (newHome) newHome->groupChanged();
 
     // scroll_last_profile came from firstVisibleRow(), so it is a proxy row.
     const int rowCount = profilesFilterModel->rowCount();
