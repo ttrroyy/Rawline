@@ -1,6 +1,6 @@
 name: Downloads badge
 
-# shields.io counts only the newest 100 releases; this sums every release and serves the badge JSON from Pages.
+# Sum every release and keep the badge JSON in a data branch.
 on:
   schedule:
     - cron: "17 */6 * * *"
@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: downloads-badge
@@ -18,18 +18,17 @@ concurrency:
 jobs:
   badge:
     runs-on: ubuntu-latest
-    outputs:
-      changed: ${{ steps.count.outputs.changed }}
     steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: download-counts
       - name: Count downloads
-        id: count
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           total=$(gh api --paginate "repos/${GITHUB_REPOSITORY}/releases?per_page=100" --jq '.[].assets[].download_count' | awk '{s+=$1} END {print s+0}')
-          mkdir -p site
-          python3 - "$total" > site/downloads.json <<'EOF'
+          python3 - "$total" > downloads.json <<'EOF'
           import json, sys
           n = int(sys.argv[1])
           def short(v):
@@ -42,27 +41,9 @@ jobs:
           assert short(4564) == '4.6k' and short(31568) == '32k' and short(999) == '999' and short(10000) == '10k'
           print(json.dumps({"schemaVersion": 1, "label": "downloads-total", "message": short(n), "color": "brightgreen"}))
           EOF
-          cat site/downloads.json
-          url="https://${GITHUB_REPOSITORY_OWNER}.github.io/${GITHUB_REPOSITORY#*/}/downloads.json"
-          if curl --fail --silent --show-error --retry 2 --max-time 15 "$url" -o published.json &&
-            cmp -s site/downloads.json published.json; then
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "changed=true" >> "$GITHUB_OUTPUT"
+          if git diff --quiet -- downloads.json; then
+            exit 0
           fi
-      - uses: actions/upload-pages-artifact@v5.0.0
-        if: steps.count.outputs.changed == 'true'
-        with:
-          path: site
-
-  deploy:
-    needs: badge
-    if: needs.badge.outputs.changed == 'true'
-    runs-on: ubuntu-latest
-    permissions:
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-    steps:
-      - uses: actions/deploy-pages@v5.0.1
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+            commit -m 'Update download count' -- downloads.json
+          git push origin HEAD:refs/heads/download-counts
