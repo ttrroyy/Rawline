@@ -154,7 +154,7 @@ int TestQwdttImport() {
         requests.clear();
         acceptCompatibleAgent = false;
         const auto forbidden = refresh();
-        check(!forbidden.ok() && forbidden.error.contains("403") && group->Profiles() == profiles &&
+        check(forbidden.failure == Subscription::UpdateOutcome::Failure::Fetch && group->Profiles() == profiles &&
               requests.size() == 2, "repeated 403 preserves the previous profiles");
         requests.clear();
         acceptCompatibleAgent = true;
