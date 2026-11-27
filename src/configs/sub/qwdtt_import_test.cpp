@@ -39,11 +39,15 @@
 #include "include/database/IpListsRepo.h"
 #include "include/database/IpScansRepo.h"
 #include <QDebug>
+#include <QEventLoop>
+#include <QHostAddress>
 #include <QTemporaryDir>
 #include <QCryptographicHash>
 #include <QFile>
 #include <QDir>
 #include <QScopeGuard>
+#include <QTcpServer>
+#include <QTcpSocket>
 #include <tuple>
 #include "include/global/Version.hpp"
 #include "NkrVersion.h"
@@ -101,6 +105,66 @@ int TestQwdttImport() {
     const auto check = [&failures](bool ok, const char *name) {
         if (!ok) { qCritical() << "qWDTT import test failed:" << name; ++failures; }
     };
+    {
+        QTcpServer server;
+        if (!server.listen(QHostAddress::LocalHost)) qFatal("Could not start the subscription test server");
+        QList<QByteArray> requests;
+        bool acceptCompatibleAgent = true;
+        QObject::connect(&server, &QTcpServer::newConnection, &server, [&] {
+            while (auto *socket = server.nextPendingConnection()) {
+                QObject::connect(socket, &QTcpSocket::disconnected, socket, &QObject::deleteLater);
+                const auto respond = [&, socket, request = QByteArray()]() mutable {
+                    request += socket->readAll();
+                    if (!request.contains("\r\n\r\n")) return;
+                    requests.append(request);
+                    const bool allowed = acceptCompatibleAgent && request.toLower().contains("\r\nuser-agent: v2rayng/1.10.16\r\n");
+                    const QByteArray body = allowed ? "socks://192.0.2.1:1080#Fixture\n" : "Forbidden";
+                    const QByteArray status = allowed ? "200 OK" : "403 Forbidden";
+                    socket->write("HTTP/1.1 " + status + "\r\nConnection: close\r\nContent-Length: " +
+                                  QByteArray::number(body.size()) + "\r\n\r\n" + body);
+                    socket->disconnectFromHost();
+                };
+                QObject::connect(socket, &QTcpSocket::readyRead, socket, respond);
+                if (socket->bytesAvailable()) emit socket->readyRead();
+            }
+        });
+        auto group = Configs::GroupsRepo::NewGroup();
+        group->name = QStringLiteral("Subscription HTTP fixture");
+        group->url = QStringLiteral("http://127.0.0.1:%1/fixture").arg(server.serverPort());
+        auto *groups = Configs::dataManager->groupsRepo.get();
+        if (!groups->AddGroup(group)) qFatal("Could not save the subscription fixture");
+        auto *updater = Subscription::updater();
+        const auto refresh = [&] {
+            QEventLoop loop;
+            Subscription::UpdateOutcome result;
+            QTimer::singleShot(30000, &loop, [] { qFatal("Subscription HTTP test timed out"); });
+            updater->RefreshWithOutcome(group->id, Subscription::GroupUpdater::Surface::Log, [&](const auto &outcome) {
+                QMetaObject::invokeMethod(&loop, [&, outcome] {
+                    result = outcome;
+                    loop.quit();
+                }, Qt::QueuedConnection);
+            });
+            loop.exec();
+            return result;
+        };
+        const auto imported = refresh();
+        const auto profiles = group->Profiles();
+        check(imported.ok() && profiles.size() == 1 && requests.size() == 2 &&
+              requests.first().contains("Happ/3.0 Rawline/"), "403 is retried with the compatible User-Agent");
+        requests.clear();
+        acceptCompatibleAgent = false;
+        const auto forbidden = refresh();
+        check(!forbidden.ok() && forbidden.error.contains("403") && group->Profiles() == profiles &&
+              requests.size() == 2, "repeated 403 preserves the previous profiles");
+        requests.clear();
+        acceptCompatibleAgent = true;
+        group->sub_options.user_agent = QStringLiteral("Happ/3.0 Rawline/custom");
+        const auto custom = refresh();
+        check(!custom.ok() && requests.size() == 1 &&
+              requests.first().contains("Happ/3.0 Rawline/custom") && group->Profiles() == profiles,
+              "403 does not override an explicit User-Agent");
+        check(groups->DeleteGroup(group->id), "subscription HTTP fixture removed");
+    }
     {
         QJsonObject nullable{{"type", "qwdtt"}, {"peer", "192.0.2.1:56000"}, {"password", "fixture"}};
         for (const auto *key : {"raw_port", "direct_port", "custom_turn_ips"})

@@ -11955,8 +11955,8 @@ To fix this, share the hotspot from the throne-tun adapter instead of "%1" (Sett
         <translation>%1 заменён обновлением; подключение к профилю с тем же именем.</translation>
     </message>
     <message>
-        <source>The server returned a web page; requesting the subscription again as another client.</source>
-        <translation>Сервер вернул веб-страницу; подписка запрашивается снова от имени другого клиента.</translation>
+        <source>Retrying the subscription request with a compatible User-Agent.</source>
+        <translation>Повторяем запрос подписки с совместимым User-Agent.</translation>
     </message>
     <message>
         <source>The Happ / Incy routing of &quot;%1&quot; is unavailable (%2) and was turned off; the client&apos;s routing is used.</source>

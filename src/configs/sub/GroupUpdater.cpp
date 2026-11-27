@@ -605,7 +605,8 @@ namespace Subscription {
     RequestIdentity ResolveIdentity(const Configs::Group *group) {
         const auto &settings = Configs::dataManager->settingsRepo;
         RequestIdentity identity;
-        identity.userAgent = settings->user_agent.isEmpty() ? QStringLiteral("Happ/3.0 Rawline/") + QStringLiteral(NKR_VERSION) : settings->GetUserAgent();
+        identity.useDefaultUserAgent = settings->user_agent.isEmpty();
+        identity.userAgent = identity.useDefaultUserAgent ? QStringLiteral("Happ/3.0 Rawline/") + QStringLiteral(NKR_VERSION) : settings->GetUserAgent();
         identity.sendHwid = settings->sub_send_hwid;
         identity.device = GetDeviceDetails();
         applyCustomHwidParams(identity.device, settings->sub_custom_hwid_params);
@@ -617,7 +618,10 @@ namespace Subscription {
 
         const auto &options = group->sub_options;
         identity.allowHwidRetry = options.send_hwid != Configs::sendHwid::off;
-        if (usableHeaderValue(options.user_agent)) identity.userAgent = options.user_agent;
+        if (usableHeaderValue(options.user_agent)) {
+            identity.userAgent = options.user_agent;
+            identity.useDefaultUserAgent = false;
+        }
         identity.tlsVersion = options.tls_version.value_or(identity.tlsVersion);
         identity.httpVersion = options.http_version.value_or(identity.httpVersion);
         if (options.send_hwid != Configs::sendHwid::keepDefault) identity.sendHwid = options.send_hwid == Configs::sendHwid::on;
@@ -1016,19 +1020,25 @@ namespace Subscription {
             MW_show_log(QObject::tr("The subscription provider rejected the device HWID. Check the device binding or enable HWID for this subscription."));
             return false;
         }
+        // Providers that reject an unrecognized default agent can return a web page or HTTP 403.
+        if (identity.useDefaultUserAgent && (resp.status == 403 || (resp.error.isEmpty() && looksLikeWebPage(resp.data)))) {
+            auto retry = identity;
+            retry.userAgent = QStringLiteral("v2rayNG/1.10.16");
+            retry.useDefaultUserAgent = false;
+            MW_show_log(QObject::tr("Retrying the subscription request with a compatible User-Agent."));
+            QString retryError;
+            const bool ok = fetch(url, name, retry, body, subInfo, &retryError, routing);
+            if (resp.error.isEmpty()) {
+                if (error != nullptr) *error = retryError;
+                return ok;
+            }
+            if (ok && !looksLikeWebPage(body)) return true;
+        }
         if (!resp.error.isEmpty()) {
             const auto reason = withoutUrls(resp.error, url);
             MW_show_log("<<<<<<<< " + QObject::tr("Requesting subscription %1 error: %2").arg(name, reason + "\n" + withoutUrls(QString::fromUtf8(resp.data), url)));
             if (error != nullptr) *error = reason;
             return false;
-        }
-        // Some subscription proxies (p.kfwl.lol) serve a web page to a client they do not know; with the app's own
-        // agent (not one the user set) the request is made once more as the widespread v2rayNG.
-        if (looksLikeWebPage(resp.data) && identity.userAgent.startsWith(QLatin1String("Happ/3.0 Rawline/"))) {
-            auto retry = identity;
-            retry.userAgent = QStringLiteral("v2rayNG/1.10.16");
-            MW_show_log(QObject::tr("The server returned a web page; requesting the subscription again as another client."));
-            return fetch(url, name, retry, body, subInfo, error, routing);
         }
         body = std::move(resp.data);
         if (const auto tag = NetworkRequestHelper::GetHeader(resp.header, "Encrypt-Tag"); !tag.isEmpty() &&

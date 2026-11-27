@@ -19,6 +19,7 @@
 namespace Subscription {
     struct RequestIdentity {
         QString userAgent;
+        bool useDefaultUserAgent = false;
         bool sendHwid = false;
         bool hwidCookie = false;
         bool allowHwidRetry = true;
