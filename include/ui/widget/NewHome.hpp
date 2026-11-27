@@ -196,6 +196,7 @@ public:
     using QStyledItemDelegate::QStyledItemDelegate;
     int runningId = -1;
     int pendingId = -1;
+    int idleTargetId = -1;
     int hoverRow = -1;
     qreal spinAngle = 0;
     static QRect chevronRect(const QRect &row);

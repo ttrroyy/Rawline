@@ -1875,7 +1875,14 @@ void NewProfileDelegate::paint(QPainter *p, const QStyleOptionViewItem &option, 
     const bool hover = option.state & QStyle::State_MouseOver;
     const int id = index.data(ProfilesTableModel::ProfileIdRole).toInt();
     const QColor ink = NewStyle::text(), dim = NewStyle::muted();
-    NewStyle::paintGlass(*p, row, 20, id == (pendingId >= 0 ? pendingId : runningId) ? ink : QColor());
+    const bool active = id == (pendingId >= 0 ? pendingId : runningId);
+    NewStyle::paintGlass(*p, row, 20, active ? ink : QColor());
+    if (!active && id == idleTargetId) {
+        const QColor mark = NewStyle::pastel() ? NewStyle::accent() : ink;
+        p->setPen(QPen(withAlpha(mark, 66), 1));
+        p->setBrush(withAlpha(mark, NewStyle::light() ? 18 : 23));
+        p->drawRoundedRect(row.adjusted(.5, .5, -.5, -.5), 20, 20);
+    }
     if (hover || selected) {
         p->setPen(Qt::NoPen);
         p->setBrush(NewStyle::overlay(hover && selected ? 16 : 10));
@@ -2598,6 +2605,7 @@ void NewHome::buildBody(QVBoxLayout *body) {
     m_list->setModelColumn(ProfilesTableModel::ColName);
     // One selection for both views: every menu acts on the servers chosen here.
     m_list->setSelectionModel(mw->ui->profilesTableView->selectionModel());
+    connect(m_list->selectionModel(), &QItemSelectionModel::selectionChanged, this, &NewHome::refreshConnectionOrb);
     m_list->rowsSwapped = [this](int from, int to) { if (mw->ui->profilesTableView->rowsSwapped) mw->ui->profilesTableView->rowsSwapped(from, to); };
     m_list->toSourceRow = [this](int row) { return mw->profilesFilterModel->toSourceRow(row); };
     m_list->editRequested = [this](const QModelIndex &index) { mw->on_profilesTableView_doubleClicked(index); };
@@ -2710,6 +2718,7 @@ void NewHome::selectTab(int index, bool animated) {
 
 void NewHome::groupChanged() {
     if (!m_attached) return;
+    refreshConnectionOrb();
     const int current = Configs::dataManager->settingsRepo->current_group;
     const bool changed = m_renderedGroup != current;
     m_renderedGroup = current;
@@ -2822,13 +2831,19 @@ void NewHome::refreshGroupHeader() {
 
 void NewHome::refreshConnectionOrb() {
     if (!m_attached) return;
+    const auto state = mw->ui->toolButton_startstop->state();
     const int pendingId = mw->connection()->pendingProfileId();
-    if (m_list->rowDelegate->pendingId != pendingId) {
-        m_list->rowDelegate->pendingId = pendingId;
+    const auto running = mw->runningSnapshot();
+    const int runningId = running ? running->id : -1;
+    const int idleTargetId = state == StartStopButton::State::Idle && pendingId < 0 && runningId < 0
+        ? mw->get_profile_to_start() : -1;
+    auto *delegate = m_list->rowDelegate;
+    if (delegate->pendingId != pendingId || delegate->runningId != runningId || delegate->idleTargetId != idleTargetId) {
+        delegate->pendingId = pendingId;
+        delegate->runningId = runningId;
+        delegate->idleTargetId = idleTargetId;
         m_list->viewport()->update();
     }
-    auto *button = mw->ui->toolButton_startstop;
-    const auto state = button->state();
     const bool connected = state == StartStopButton::State::Running;
     const bool connecting = state == StartStopButton::State::Connecting;
     if (connected && !m_wasRunning) m_connectedFor.start();
@@ -2887,12 +2902,6 @@ void NewHome::refresh() {
     if (m_inbound->text() != mw->ui->label_inbound->text()) m_inbound->setText(mw->ui->label_inbound->text());
     m_inbound->setToolTip(mw->ui->label_inbound->toolTip());
 
-    const auto running = mw->runningSnapshot();
-    const int runningId = running ? running->id : -1;
-    if (m_list->rowDelegate->runningId != runningId) {
-        m_list->rowDelegate->runningId = runningId;
-        m_list->viewport()->update();
-    }
     refreshGroupHeader();
     m_empty->setVisible(m_list->model() && m_list->model()->rowCount() == 0 && m_search->text().isEmpty());
     if (m_renderedGroup == -1) m_renderedGroup = settings->current_group;

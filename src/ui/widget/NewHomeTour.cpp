@@ -175,6 +175,21 @@ void NewHome::runTour(MainWindow *mw, const QString &dir) {
         s << std::pair{QStringLiteral("home"), std::function<void()>([home] {
             if (auto *h = home(); h && h->m_list->model() && h->m_list->model()->rowCount() > 1) h->m_list->setCurrentIndex(h->m_list->model()->index(1, 0));
         })};
+        s << std::pair{QStringLiteral("idle-profile-target"), std::function<void()>([home, mw] {
+            auto *list = home()->m_list;
+            auto *selection = list->selectionModel();
+            const auto next = list->model()->index(1, list->modelColumn());
+            if (!next.isValid()) qFatal("Idle profile test needs at least two profiles");
+            selection->clearSelection();
+            home()->refreshConnectionOrb();
+            const int defaultId = mw->get_profile_to_start();
+            if (defaultId < 0 || list->rowDelegate->idleTargetId != defaultId || list->rowDelegate->runningId >= 0)
+                qFatal("The idle connection target is missing");
+            selection->select(next, QItemSelectionModel::ClearAndSelect | QItemSelectionModel::Rows);
+            if (list->rowDelegate->idleTargetId != next.data(ProfilesTableModel::ProfileIdRole).toInt())
+                qFatal("The idle connection target did not follow the selection");
+            selection->clearSelection();
+        })};
 #ifdef Q_OS_WIN
         s << std::pair{QString(), std::function<void()>([mw] {
             const auto *caption = mw->findChild<QWidget *>(QStringLiteral("rawlineMainCaption"));
